@@ -911,9 +911,11 @@ async function roApi(files,signal){const imgs=[];for(const f of files)imgs.push(
   let r;try{r=await fetch('/api/roster',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,pass:roPass()}),signal});}
   catch(x){if(x&&x.name==='AbortError')throw{code:'cancelled'};throw{code:'no_backend'};}
   let j=null;try{j=await r.json();}catch(x){}
+  if(!r.ok||!j||!j.result)if(r.status===502||r.status===500)throw{code:'upstream',msg:'HTTP '+r.status+((j&&j.status)?' / API '+j.status:'')+((j&&j.detail)?' / '+j.detail:'')};
   if(!r.ok||!j||!j.result)throw{code:(r.status===401)?'bad_pass':(j&&j.error==='no_api_key')?'no_api_key':(j&&j.error==='rate_limited')?'rate_limited':(j&&j.error==='invalid_json')?'invalid_json':(r.status===404||r.status===405)?'no_backend':'server'};
   return j.result;}
 function roErr(e){const c=e&&e.code;
+  if(c==='upstream')return '読み取りに失敗しました。原因: '+(e.msg||'')+'(この文をそのまま伝えてください)';
   if(c==='no_api_key')return 'このページでは、画像読み取りの設定(APIキー)がまだ入っていません。管理者に連絡するか、表を貼り付けてください。';
   if(c==='no_backend')return 'この場所では、画像の読み取りが使えません。表を貼り付けてください。';
   if(c==='cancelled')return '';

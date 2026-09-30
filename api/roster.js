@@ -37,13 +37,17 @@ module.exports = async (req, res) => {
       body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 4000, messages: [{ role: 'user', content }] }),
     });
     if (r.status === 429) return res.status(429).json({ error: 'rate_limited' });
-    if (!r.ok) return res.status(502).json({ error: 'upstream', status: r.status });
+    if (!r.ok) {
+      let msg = '';
+      try { const e = await r.json(); msg = (e && e.error && e.error.message) || ''; } catch (e) {}
+      return res.status(502).json({ error: 'upstream', status: r.status, detail: String(msg).slice(0, 200) });
+    }
     const j = await r.json();
     const text = (j.content || []).map(c => c.text || '').join('');
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) return res.status(422).json({ error: 'invalid_json' });
     return res.status(200).json({ result: JSON.parse(m[0]) });
   } catch (e) {
-    return res.status(500).json({ error: 'server' });
+    return res.status(500).json({ error: 'server', detail: String((e && e.message) || e).slice(0, 200) });
   }
 };
