@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ラグビー試合記録</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -252,6 +257,8 @@ textarea{min-height:92px;resize:vertical}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (max-width:340px){.teams2,.fgrid{grid-template-columns:1fr}}
 </style>
+</head>
+<body>
 
 <header id="head"></header>
 <main id="main"></main>
@@ -309,7 +316,8 @@ function load(){const s=ls.get(KEY); if(s){try{return merge(fresh(),JSON.parse(s
 let S=load();
 let tab=ls.get(KEYT); if(!TABS.some(t=>t[0]===tab)) tab='info';
 let mt='h',draft=null,newArm=0,lastRm=null,saveOK=true,saveT=null;
-const caps={dl:null,sm:null,img:null};
+const browserDl={save:async({filename,data})=>{const b=data instanceof Blob?data:new Blob([data],{type:/\.html$/.test(filename)?'text/html':/\.json$/.test(filename)?'application/json':'text/plain'});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(u);},4000);return{status:'saved'};}};
+const caps={dl:browserDl,sm:null,img:null};
 
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{saveOK=ls.set(KEY,JSON.stringify(S));const b=$('#sv');if(b)b.textContent=saveOK?'この端末に自動保存しています':'自動保存できません。バックアップを保存してください';},200);}
 function stash(){ls.set(KEYP,JSON.stringify(S));}
@@ -894,7 +902,19 @@ function parseRoster(text){
   return{rows,skipped};}
 const ROSTER_PROMPT='添付の画像は、ラグビーの試合のメンバー表です(選手名簿、または記録用紙のメンバー欄)。背番号1〜23の選手を読み取り、JSONだけで返してください。\nチームが1つだけ写っていても、ホーム(左)とアウェイ(右)の2チームが写っていても、次の形式で、写っているチームの数だけ入れてください。\n{"teams":[{"side":"home か away か unknown","team":"チーム名(書かれていれば。なければ空文字)","players":[{"no":背番号(数字),"name":"苗字 名前","grade":"学年(数字だけ。なければ空文字)","fr":フロントロー適合の○が付いていればtrue,"cap":ゲームキャプテンの印(背番号を丸で囲むなど)があればtrue}]}]}\n記録用紙では、左の表がHome、右の表がAwayです。読めない文字は推測せず、その項目を空にしてください。画像にない選手を作らないでください。苗字と名前の間は半角スペース1つにしてください。画像が複数あるときは、すべてをまとめて読み取ってください。';
 let roCtl=null;
+function roShrink(f){return new Promise((ok,ng)=>{const u=URL.createObjectURL(f),im=new Image();
+  im.onload=()=>{const k=Math.min(1,2000/Math.max(im.naturalWidth,im.naturalHeight)),cv=document.createElement('canvas');cv.width=Math.round(im.naturalWidth*k);cv.height=Math.round(im.naturalHeight*k);
+    const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);ok(cv.toDataURL('image/jpeg',0.85).split(',')[1]);};
+  im.onerror=()=>{URL.revokeObjectURL(u);ng({code:'image_rejected'});};im.src=u;});}
+async function roApi(files,signal){const imgs=[];for(const f of files)imgs.push({data:await roShrink(f)});
+  let r;try{r=await fetch('/api/roster',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs}),signal});}
+  catch(x){if(x&&x.name==='AbortError')throw{code:'cancelled'};throw{code:'no_backend'};}
+  let j=null;try{j=await r.json();}catch(x){}
+  if(!r.ok||!j||!j.result)throw{code:(j&&j.error==='no_api_key')?'no_api_key':(j&&j.error==='rate_limited')?'rate_limited':(j&&j.error==='invalid_json')?'invalid_json':(r.status===404||r.status===405)?'no_backend':'server'};
+  return j.result;}
 function roErr(e){const c=e&&e.code;
+  if(c==='no_api_key')return 'このページでは、画像読み取りの設定(APIキー)がまだ入っていません。管理者に連絡するか、表を貼り付けてください。';
+  if(c==='no_backend')return 'この場所では、画像の読み取りが使えません。表を貼り付けてください。';
   if(c==='cancelled')return '';
   if(c==='not_granted'||c==='sampling_disabled'||c==='images_unavailable'||c==='capability_disabled'||c==='capability_removed'||c==='not_declared')return 'この画面では、画像を読み取れません。表をコピーして貼り付けてください。';
   if(c==='image_rejected')return 'この画像は読み込めません。JPEGかPNGの、別の画像を選んでください。';
@@ -926,16 +946,17 @@ function sheetRoster(){const d=draft,gs=d.groups;
       (g.tname?'<label class="chk"><input type="checkbox" id="ro-un-'+gi+'" data-bind="d.groups.'+gi+'.useName"'+(g.useName?' checked':'')+'><span>チーム名を「'+esc(g.tname)+'」にする</span></label>':'');});
     return h+'<div class="actions"><button class="btn" data-a="ro-again">やり直す</button><span class="sp"></span><button class="btn primary" data-a="ro-apply">この内容で入れる</button></div>';}
   h+=stp(1,'写真・画像から読み取る')+'<button class="btn primary lg" data-a="ro-img">写真・画像を選ぶ</button>'+
-   '<p class="hint">メンバー表の写真やスクリーンショットを、Claudeが読み取ります。記録用紙のように、ホームとアウェイの2チームが写っていれば、両方を一度に読み取ります。スクリーンショットは、この画面に貼り付ける(Ctrl+V)か、ドラッグしても読み込めます。PDFは、画像にしてから選んでください。まっすぐ・明るく撮ると読み取りやすくなります。'+(caps.sm?'はじめて使うときに、許可の確認が出ます。':'この画面では使えないことがあります。使えないときは、下の方法を試してください。')+'</p>'+
+   '<p class="hint">メンバー表の写真やスクリーンショットを、Claudeが読み取ります。記録用紙のように、ホームとアウェイの2チームが写っていれば、両方を一度に読み取ります。スクリーンショットは、この画面に貼り付ける(Ctrl+V)か、ドラッグしても読み込めます。PDFは、画像にしてから選んでください。まっすぐ・明るく撮ると読み取りやすくなります。'+(caps.sm?'はじめて使うときに、許可の確認が出ます。':'')+'</p>'+
    stp(2,'表をコピーして貼り付ける')+'<textarea id="ro-text" data-bind="d.text" rows="6" placeholder="1  佐藤 太郎  4&#10;2  鈴木 健太  3&#10;3  高橋 翔  3">'+esc(d.text)+'</textarea>'+
    '<p class="hint">ExcelやGoogleスプレッドシートで、背番号・氏名・学年の列を選んでコピーし、貼り付けます。列の順番が違っていても大丈夫です。背番号がないときは、上から1番、2番…と入れます。</p><div class="btnrow"><button class="btn lg" data-a="ro-parse">読み取る</button><button class="btn lg" data-a="ro-file">CSV・テキストを選ぶ</button></div>';
   return h+'<div class="actions"><span class="sp"></span><button class="btn" data-a="close">やめる</button></div>';}
 function roFinish(d,gs,skipped){d.busy=false;d.groups=gs.length?gs:null;d.skipped=skipped||[];d.err=gs.length?'':'表の中に、選手が見つかりませんでした。';if(draft===d)renderSheet();}
 async function roImages(files){if(!files.length||!draft||draft.k!=='roster')return;
-  if(!caps.sm){toast('この画面では、画像の読み取りが使えません。表を貼り付けてください',null,5000);return;}
   const d=draft;d.busy=true;d.err='';renderSheet();roCtl=new AbortController();
-  try{const max=(caps.img&&caps.img.maxCount)||1,use=files.slice(0,max);
-    const res=await caps.sm.json(ROSTER_PROMPT,{images:use.length===1?use[0]:use,signal:roCtl.signal});
+  try{let res;
+    if(caps.sm&&caps.img){const max=caps.img.maxCount||1,use=files.slice(0,max);
+      res=await caps.sm.json(ROSTER_PROMPT,{images:use.length===1?use[0]:use,signal:roCtl.signal});}
+    else res=await roApi(files.slice(0,3),roCtl.signal);
     const r=roGroupsFrom(res);if(draft!==d)return;roFinish(d,r.gs,r.skipped);}
   catch(x){d.busy=false;d.err=roErr(x);if(draft===d)renderSheet();}
   finally{roCtl=null;}}
@@ -947,7 +968,7 @@ A['ro-open']=()=>{draft={k:'roster',team:mt,text:'',groups:null,skipped:[],busy:
 A['ro-parse']=()=>{if(!draft.text.trim()){toast('表を貼り付けてください');return;}const r=parseRoster(draft.text);roFinish(draft,r.rows.length?[{team:draft.team,tname:'',useName:false,rows:r.rows}]:[],r.skipped);};
 A['ro-again']=()=>{draft.groups=null;draft.err='';renderSheet();};
 A['ro-file']=()=>$('#rf').click();
-A['ro-img']=()=>{if(caps.sm&&!caps.img){toast('この画面では、画像を送れません。表を貼り付けてください',null,5000);return;}if(!caps.sm){toast('この画面では、画像の読み取りが使えません。表を貼り付けてください',null,5000);return;}$('#ri').click();};
+A['ro-img']=()=>{$('#ri').click();};
 A['ro-stop']=()=>{if(roCtl)roCtl.abort();};
 A['ro-apply']=()=>{const d=draft;if(!d.groups||!d.groups.length)return;
   const snap=JSON.stringify(S.roster),nm=[S.teams.h.name,S.teams.a.name];let n=0;
@@ -974,7 +995,9 @@ $('#nav').innerHTML=TABS.map(t=>'<button data-a="tab" data-v="'+t[0]+'"><svg vie
 {const st=document.createElement('style');st.id='sheetcss';st.textContent=SHEET_CSS;document.head.appendChild(st);}
 renderHead();render();
 if(S.clock.start)wake(true);
-(async()=>{try{if(window.claude&&window.claude.use){caps.dl=await window.claude.use('downloads');if(caps.dl&&tab==='sum'&&$('#ov').hidden){const y=window.scrollY;render();window.scrollTo(0,y);}}}catch(e){}
+(async()=>{try{if(window.claude&&window.claude.use){{const dd=await window.claude.use('downloads');if(dd)caps.dl=dd;}if(caps.dl&&tab==='sum'&&$('#ov').hidden){const y=window.scrollY;render();window.scrollTo(0,y);}}}catch(e){}
   try{if(window.claude&&window.claude.use){caps.sm=await window.claude.use('sample');if(caps.sm){const l=await caps.sm.limits().catch(()=>null);if(l&&l.images){caps.img=l.images;$('#ri').accept=(l.images.mediaTypes||[]).join(',')||'image/*';$('#ri').multiple=(l.images.maxCount||1)>1;if(draft&&draft.k==='roster'&&!$('#ov').hidden)renderSheet();}}}}catch(e){}})();
 })();
 </script>
+</body>
+</html>

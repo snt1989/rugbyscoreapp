@@ -1,0 +1,1 @@
+{ "functions": { "api/roster.js": { "maxDuration": 60 } } }

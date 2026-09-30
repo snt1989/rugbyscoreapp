@@ -8,8 +8,17 @@
 - 提出用シートのプレビューと、PDF・HTMLの書き出し
 
 ## 使い方
-`index.html` をブラウザで開きます。GitHub Pages で公開もできます(Settings → Pages → main / root)。
+`index.html` をブラウザで開きます。Vercelにデプロイすると、URLだけでスマホから使えます。
 
-## 注意
-画像の読み取りと、PDFの保存ボタンは、Claudeのアーティファクト上で動く機能です。
-単体のページでは、表の貼り付けとHTML書き出し(印刷 → PDF)を使ってください。
+## Vercelでの設定(画像読み取りを使う場合)
+1. このリポジトリをVercelにImportしてDeployします(ビルド設定は不要です)。
+2. Project → Settings → Environment Variables に `ANTHROPIC_API_KEY` を追加します(任意で `ANTHROPIC_MODEL`)。
+3. Redeployします。
+
+`api/roster.js` が、メンバー表の画像をClaudeで読み取ります。APIキーがない場合でも、表の貼り付けとCSV取り込みは使えます。
+公開URLを知っている人が誰でも使えるため、画像読み取りの利用料はAPIキーの持ち主にかかります。
+不特定多数に見せない場合は、Vercelの「Deployment Protection(パスワード保護)」を有効にしてください。
+
+## PDF保存
+「記録用紙をPDFで保存」は、ブラウザの機能だけでA3の1ページPDFを作って保存します(Chrome・Edge・Firefoxで確認済み)。
+Safari(iPhone)でPDFが作れない場合は、「HTMLで保存」→ 印刷 → PDF を使ってください。
