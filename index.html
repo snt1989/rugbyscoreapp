@@ -906,11 +906,12 @@ function roShrink(f){return new Promise((ok,ng)=>{const u=URL.createObjectURL(f)
   im.onload=()=>{const k=Math.min(1,2000/Math.max(im.naturalWidth,im.naturalHeight)),cv=document.createElement('canvas');cv.width=Math.round(im.naturalWidth*k);cv.height=Math.round(im.naturalHeight*k);
     const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);ok(cv.toDataURL('image/jpeg',0.85).split(',')[1]);};
   im.onerror=()=>{URL.revokeObjectURL(u);ng({code:'image_rejected'});};im.src=u;});}
+function roPass(v){try{if(v===undefined)return localStorage.getItem('rugby-record-pass')||'';if(v)localStorage.setItem('rugby-record-pass',v);else localStorage.removeItem('rugby-record-pass');}catch(e){}return '';}
 async function roApi(files,signal){const imgs=[];for(const f of files)imgs.push({data:await roShrink(f)});
-  let r;try{r=await fetch('/api/roster',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs}),signal});}
+  let r;try{r=await fetch('/api/roster',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({images:imgs,pass:roPass()}),signal});}
   catch(x){if(x&&x.name==='AbortError')throw{code:'cancelled'};throw{code:'no_backend'};}
   let j=null;try{j=await r.json();}catch(x){}
-  if(!r.ok||!j||!j.result)throw{code:(j&&j.error==='no_api_key')?'no_api_key':(j&&j.error==='rate_limited')?'rate_limited':(j&&j.error==='invalid_json')?'invalid_json':(r.status===404||r.status===405)?'no_backend':'server'};
+  if(!r.ok||!j||!j.result)throw{code:(r.status===401)?'bad_pass':(j&&j.error==='no_api_key')?'no_api_key':(j&&j.error==='rate_limited')?'rate_limited':(j&&j.error==='invalid_json')?'invalid_json':(r.status===404||r.status===405)?'no_backend':'server'};
   return j.result;}
 function roErr(e){const c=e&&e.code;
   if(c==='no_api_key')return 'このページでは、画像読み取りの設定(APIキー)がまだ入っていません。管理者に連絡するか、表を貼り付けてください。';
@@ -938,6 +939,7 @@ function sheetRoster(){const d=draft,gs=d.groups;
   if(d.busy)return h+'<div class="note"><p>画像を読み取っています。30秒ほどかかることがあります。</p></div><div class="actions"><span class="sp"></span><button class="btn" data-a="ro-stop">中止</button></div>';
   if(!gs)h+='<div class="f"><span class="lb">どのチームに入れますか(1チーム分のとき)</span>'+teamSeg()+'</div>';
   if(d.err)h+='<div class="warnbox">'+esc(d.err)+'</div>';
+  if(d.needPass&&!gs)return h+'<div class="f"><label class="lb" for="ro-pw">パスコード</label><input id="ro-pw" type="password" autocomplete="current-password" data-bind="d.pw" value="'+esc(d.pw||'')+'"></div><p class="hint">パスコードは、この端末に保存されます。次からは入力不要です。</p><div class="actions"><button class="btn" data-a="ro-again">戻る</button><span class="sp"></span><button class="btn primary" data-a="ro-pass">読み取る</button></div>';
   if(gs){
     const n=gs.reduce((p,g)=>p+g.rows.length,0);
     h+='<p class="hint">読み取り結果を確認してください。'+n+'人分が見つかりました。読み取れた背番号だけを入れ替えます。ほかの番号は、そのままです。'+(gs.length===1?'':'ホームとアウェイの両方を入れます。')+'</p>';
@@ -958,7 +960,7 @@ async function roImages(files){if(!files.length||!draft||draft.k!=='roster')retu
       res=await caps.sm.json(ROSTER_PROMPT,{images:use.length===1?use[0]:use,signal:roCtl.signal});}
     else res=await roApi(files.slice(0,3),roCtl.signal);
     const r=roGroupsFrom(res);if(draft!==d)return;roFinish(d,r.gs,r.skipped);}
-  catch(x){d.busy=false;d.err=roErr(x);if(draft===d)renderSheet();}
+  catch(x){d.busy=false;if(x&&x.code==='bad_pass'){d.needPass=true;d.files=files;d.err=roPass()?'パスコードが違います。':'この機能を使うには、パスコードが必要です。';}else d.err=roErr(x);if(draft===d)renderSheet();}
   finally{roCtl=null;}}
 function roText(f){if(!f||!draft||draft.k!=='roster')return;const d=draft,fr=new FileReader();
   fr.onload=()=>{if(draft!==d)return;const buf=fr.result;let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(x){try{txt=new TextDecoder('shift_jis').decode(buf);}catch(y){txt=new TextDecoder().decode(buf);}}
@@ -966,7 +968,8 @@ function roText(f){if(!f||!draft||draft.k!=='roster')return;const d=draft,fr=new
   fr.readAsArrayBuffer(f);}
 A['ro-open']=()=>{draft={k:'roster',team:mt,text:'',groups:null,skipped:[],busy:false,err:''};showSheet();};
 A['ro-parse']=()=>{if(!draft.text.trim()){toast('表を貼り付けてください');return;}const r=parseRoster(draft.text);roFinish(draft,r.rows.length?[{team:draft.team,tname:'',useName:false,rows:r.rows}]:[],r.skipped);};
-A['ro-again']=()=>{draft.groups=null;draft.err='';renderSheet();};
+A['ro-again']=()=>{draft.groups=null;draft.err='';draft.needPass=false;renderSheet();};
+A['ro-pass']=()=>{const d=draft;if(!d.pw){toast('パスコードを入れてください');return;}roPass(d.pw);d.needPass=false;const f=d.files;d.files=null;d.pw='';roImages(f);};
 A['ro-file']=()=>$('#rf').click();
 A['ro-img']=()=>{$('#ri').click();};
 A['ro-stop']=()=>{if(roCtl)roCtl.abort();};
