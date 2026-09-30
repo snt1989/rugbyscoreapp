@@ -1,0 +1,980 @@
+<title>ラグビー試合記録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: scorer's clipboard. Sticky scoreboard on top, five task tabs pinned at the bottom, entry sheets slide up over the list. Home = blue ink, Away = brick ink, pitch green for controls. */
+:root{
+  --bg:#EDF0EA; --surface:#FFFFFF; --surface2:#E2E7E0; --fg:#18211B; --muted:#56635B; --line:#C9D1C8;
+  --accent:#1D6A49; --on-accent:#FFFFFF;
+  --home:#1D4F9F; --home-soft:#DCE6F6; --away:#B23A2A; --away-soft:#F6E0DB; --on-team:#FFFFFF;
+  --yellow:#F2C200; --red:#C9302C; --ok:#1D6A49; --warn:#8A5D00; --warn-soft:#F7ECCB;
+  --f-body:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  --f-num:"Barlow Condensed","Arial Narrow",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1613; --surface:#182019; --surface2:#222D25; --fg:#E6EDE7; --muted:#96A69B; --line:#2F3D34;
+  --accent:#4CC38A; --on-accent:#07140D;
+  --home:#86AEF2; --home-soft:#1B2A45; --away:#F28E76; --away-soft:#41211B; --on-team:#0C1410;
+  --yellow:#F2C200; --red:#E0524D; --ok:#4CC38A; --warn:#E6B54A; --warn-soft:#3A2F12;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1613; --surface:#182019; --surface2:#222D25; --fg:#E6EDE7; --muted:#96A69B; --line:#2F3D34;
+  --accent:#4CC38A; --on-accent:#07140D;
+  --home:#86AEF2; --home-soft:#1B2A45; --away:#F28E76; --away-soft:#41211B; --on-team:#0C1410;
+  --yellow:#F2C200; --red:#E0524D; --ok:#4CC38A; --warn:#E6B54A; --warn-soft:#3A2F12;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--fg)}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+button:disabled{cursor:default}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h2{font-size:17px;margin:0;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted);font-size:12px}
+.hint{font-size:12.5px;color:var(--muted)}
+.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.sp{flex:1}
+.t-h{--tc:var(--home);--ts:var(--home-soft)}
+.t-a{--tc:var(--away);--ts:var(--away-soft)}
+
+/* scoreboard */
+#head{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.hin{max-width:720px;margin:0 auto;padding:8px 16px 10px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:4px 10px;align-items:center}
+.hsc{min-width:0;color:var(--tc)}
+.hsc.r{text-align:right}
+.hn{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--fg);min-width:0}
+.hsc.r .hn{justify-content:flex-end}
+.bignum{display:block;font:700 46px/1 var(--f-num);font-variant-numeric:tabular-nums}
+.hclk{display:grid;justify-items:center;padding:3px 12px;border-radius:10px;background:var(--surface2)}
+.hclk .hl{font-size:11px;color:var(--muted)}
+#clk{font:600 26px/1.05 var(--f-num);font-variant-numeric:tabular-nums}
+.hctl{grid-column:1/-1;display:flex;gap:8px;align-items:center;justify-content:space-between}
+.chip{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:5px;background:var(--tc);color:var(--on-team);font:700 12px var(--f-num);font-style:normal;flex:none}
+
+/* controls */
+.btn{min-height:48px;padding:0 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn.sm{min-height:36px;padding:0 10px;font-size:13px}
+.btn:disabled{opacity:.4}
+.btn svg{width:18px;height:18px}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg.wrap{flex-wrap:wrap;border:0;gap:6px;background:none;overflow:visible}
+.seg.big{display:flex}
+.seg.big .sg{flex:1;min-height:46px}
+.sg{min-height:40px;padding:0 12px;font-weight:700}
+.seg.wrap .sg{border:1.5px solid var(--line);border-radius:10px;background:var(--surface)}
+.sg[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
+.seg.wrap .sg[aria-pressed=true]{border-color:var(--accent)}
+.sg.t-h[aria-pressed=true],.sg.t-a[aria-pressed=true]{background:var(--tc);color:var(--on-team);border-color:var(--tc)}
+
+/* layout */
+.page{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:12px calc(92px + env(safe-area-inset-bottom,0px));display:grid;gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;gap:10px;min-width:0}
+.ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ph h2{margin-right:auto}
+.note{background:var(--surface2);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.note p{flex:1;min-width:180px}
+.teams2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tp{border:1.5px solid var(--tc);padding:10px;gap:8px}
+.tph{display:flex;gap:6px;align-items:center;color:var(--tc);font-weight:700;min-width:0}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sbtn{min-height:62px;padding:6px 8px;border-radius:10px;border:1.5px solid var(--tc);background:var(--ts);color:var(--tc);display:grid;grid-template-columns:1fr auto;align-content:center;align-items:baseline;text-align:left}
+.sbtn .code{font:700 26px/1 var(--f-num)}
+.sbtn .pt{font:600 13px var(--f-num)}
+.sbtn .nm{grid-column:1/-1;font-size:10.5px;line-height:1.25;color:var(--muted)}
+.sbtn.strong{background:var(--tc);color:var(--on-team)}
+.sbtn.strong .nm{color:inherit;opacity:.9}
+.sbtn.miss{background:transparent;border-style:dashed}
+.sbtn:active{transform:scale(.97)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fteam{display:grid;gap:6px}
+.fteam>b{color:var(--tc);font-size:13px}
+.frow{display:grid;grid-template-columns:26px 40px 1fr 40px;align-items:center;gap:4px}
+.frow span{font:700 15px var(--f-num);color:var(--muted)}
+.frow output{font:700 26px/1 var(--f-num);text-align:center;font-variant-numeric:tabular-nums}
+.sq{min-height:40px;border:1.5px solid var(--line);border-radius:10px;font-weight:700;font-size:20px;background:var(--surface)}
+.sq.add{border-color:var(--tc);color:var(--tc)}
+
+/* lists */
+.row{display:grid;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 4px;border-top:1px solid var(--line);min-height:52px}
+.ev{grid-template-columns:54px minmax(0,1fr) 44px 66px}
+.tm{font:600 13px var(--f-num);color:var(--muted);white-space:nowrap}
+.tm b{font-size:22px;color:var(--fg)}
+.who{display:flex;gap:6px;align-items:center;min-width:0}
+.code{font:700 20px var(--f-num);color:var(--tc)}
+.code.miss{opacity:.55}
+.rs{justify-self:end;font:600 21px var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rs .h{color:var(--home)} .rs .a{color:var(--away)}
+.cr{grid-template-columns:54px minmax(0,1fr)}
+.cr .l1{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-weight:700}
+.cr .l2{display:block;font-size:13.5px;overflow-wrap:anywhere}
+.cr .l3{display:block;font-size:12px;color:var(--muted)}
+.conc{font-size:11px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--warn-soft);color:var(--warn)}
+.cardi{display:inline-block;width:14px;height:20px;border-radius:2px;flex:none}
+.cardi.y{background:var(--yellow)} .cardi.r{background:var(--red)}
+.empty{padding:14px 6px;text-align:center;color:var(--muted);display:grid;gap:8px;justify-items:center;font-size:13.5px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+
+/* forms */
+.f{display:grid;gap:4px;min-width:0}
+.lb{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.02em}
+input:not([type=checkbox]),textarea{width:100%;min-height:44px;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);font-size:16px;min-width:0}
+textarea{min-height:92px;resize:vertical}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.mrow{display:grid;grid-template-columns:40px minmax(0,1fr) 46px 38px 38px;gap:6px;align-items:center}
+.mrow input{padding:6px 8px}
+.mrow input.gr{padding:6px 2px;text-align:center}
+.no{display:grid;justify-items:center;line-height:1.1}
+.no b{font:700 21px var(--f-num)}
+.no small{font-size:9.5px;color:var(--muted)}
+.tg{min-height:38px;border:1.5px solid var(--line);border-radius:8px;font-weight:700;font-size:12px;background:var(--surface)}
+.tg[aria-pressed=true]{background:var(--tc);color:var(--on-team);border-color:var(--tc)}
+.mhead{display:grid;grid-template-columns:40px minmax(0,1fr) 46px 38px 38px;gap:6px;font-size:11px;color:var(--muted);font-weight:700;text-align:center}
+
+/* summary */
+.res .line{display:flex;align-items:center;justify-content:center;gap:12px;font-weight:700;flex-wrap:wrap}
+.res .line b{font:700 44px/1 var(--f-num);font-variant-numeric:tabular-nums}
+.res .line .t-h,.res .line .t-a{color:var(--tc)}
+.ox{overflow-x:auto}
+.st{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;text-align:center}
+.st th,.st td{border:1px solid var(--line);padding:6px 4px}
+.st thead th{background:var(--surface2)}
+.st tbody th{text-align:left;padding-left:8px;background:var(--surface2);width:22%}
+.st th.t-h,.st th.t-a{color:var(--tc)}
+.st .tot td{font:700 24px var(--f-num)}
+.pill{padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700}
+.pill.ok{background:var(--ok);color:var(--on-accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.ckr{display:flex;align-items:center;gap:10px;min-height:44px;text-align:left;border-top:1px solid var(--line);width:100%;padding:4px 2px}
+.dot{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.dot.ok{background:var(--ok);color:var(--on-accent)}
+.dot.no{border:2px solid var(--warn)}
+.cb{display:flex;gap:8px;align-items:center}
+.cb code{flex:1;min-width:0;overflow-wrap:anywhere;padding:8px 10px;background:var(--surface2);border-radius:8px;font:13.5px/1.4 var(--f-body)}
+.sig{display:grid;gap:6px}
+.sig canvas{width:100%;height:110px;border:1.5px dashed var(--line);border-radius:10px;background:#fff;touch-action:none;display:block}
+.sig .top{display:flex;align-items:center;justify-content:space-between}
+
+/* nav, sheet, toast */
+#nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom,0px)}
+#nav button{display:grid;justify-items:center;gap:2px;padding:8px 2px 7px;font-size:11px;font-weight:700;color:var(--muted);border-top:3px solid transparent;margin-top:-1px}
+#nav button[aria-current=page]{color:var(--accent);border-top-color:var(--accent)}
+#nav svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#ov{position:fixed;inset:0;z-index:50}
+.bd{position:absolute;inset:0;background:rgba(10,16,12,.55)}
+.sheet{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:min(100%,560px);max-height:90%;overflow:auto;background:var(--surface);border-radius:18px 18px 0 0;padding:16px 16px 0;display:grid;gap:14px;align-content:start;outline:none;animation:up .18s ease-out}
+@keyframes up{from{transform:translate(-50%,24px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.actions{position:sticky;bottom:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface);border-top:1px solid var(--line);padding:10px 0 calc(12px + env(safe-area-inset-bottom,0px))}
+.numgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.nb{min-height:56px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);display:grid;place-items:center;align-content:center;line-height:1.1;padding:2px;min-width:0}
+.nb b{font:700 21px var(--f-num)}
+.nb small{font-size:9.5px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nb[aria-pressed=true]{background:var(--tc);border-color:var(--tc);color:var(--on-team)}
+.nb[aria-pressed=true] small{color:inherit}
+.timerow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:6px}
+.step input{width:76px;text-align:center;font:700 24px var(--f-num)}
+.step button{width:44px;height:44px;border:1.5px solid var(--line);border-radius:10px;font-size:22px;background:var(--surface)}
+.numin{display:flex;align-items:center;gap:8px}
+.numin input{width:84px;text-align:center;font:700 22px var(--f-num)}
+.np{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:12px;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);font-size:14px;flex-wrap:wrap}
+#toast button{font-weight:700;color:inherit;text-decoration:underline;padding:6px 4px}
+
+/* beginner-friendly additions */
+[hidden]{display:none!important}
+.seg.wrap .sg[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.seg.wrap .sg.t-h[aria-pressed=true],.seg.wrap .sg.t-a[aria-pressed=true]{background:var(--tc);color:var(--on-team);border-color:var(--tc)}
+#head .sg{min-height:44px;padding:0 10px}
+.hbtn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);font-weight:700;font-size:18px;flex:none}
+.guide{background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:14px;display:grid;gap:10px;justify-items:start}
+.guide b{font-size:17px}
+.steps{margin:0;padding-left:1.4em;display:grid;gap:6px}
+.tblk{display:grid;gap:8px;border:1.5px solid var(--tc);border-radius:14px;background:var(--surface);padding:10px;min-width:0}
+.tblk .tph{font-size:16px}
+.tryb{min-height:84px;border-radius:12px;background:var(--tc);color:var(--on-team);font-size:22px;font-weight:700;display:grid;place-items:center;align-content:center;line-height:1.25}
+.tryb small{font-size:14px;font-weight:400}
+.tryb:active,.othb:active{transform:scale(.98)}
+.othb{min-height:60px;border-radius:12px;border:1.5px solid var(--tc);color:var(--tc);background:var(--ts);font-weight:700;font-size:15px;line-height:1.3;padding:4px 6px;display:grid;place-items:center;align-content:center}
+.othb small{font-size:11.5px;font-weight:400;color:var(--muted)}
+.fteam2{display:grid;gap:10px;min-width:0;align-content:start}
+.fteam2>b{color:var(--tc);font-size:15px}
+.fl{display:block;font-size:12.5px;color:var(--muted);line-height:1.3;margin-bottom:4px}
+.fr2{display:grid;grid-template-columns:52px 1fr 52px;align-items:center;gap:6px}
+.fr2 output{font:700 32px/1 var(--f-num);text-align:center;font-variant-numeric:tabular-nums}
+.sq{min-height:52px}
+.ev{grid-template-columns:54px minmax(0,1fr) auto}
+.evm{min-width:0;display:grid}
+.evm .l1{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted);min-width:0}
+.evm .l2{font-weight:700;overflow-wrap:anywhere}
+.evm .l3{font-size:13.5px;color:var(--muted)}
+.warnt{color:var(--warn);font-weight:700;font-style:normal}
+.btnrow .lg{flex:1}
+.btn.lg{min-height:56px;font-size:17px;width:100%}
+.btnrow .btn.lg{width:auto;min-width:140px}
+.sh{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;padding-top:4px}
+.sh b{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font:700 16px var(--f-num);flex:none}
+.opts{display:grid;gap:8px}
+.opt{display:grid;grid-template-columns:1fr auto;gap:0 10px;text-align:left;padding:10px 12px;min-height:60px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);align-items:center}
+.opt .on{font-weight:700;font-size:16px}
+.opt .op{font:700 22px var(--f-num);color:var(--tc)}
+.opt .od{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.opt[aria-pressed=true]{border-color:var(--tc);background:var(--ts);box-shadow:inset 0 0 0 1.5px var(--tc)}
+.opt[aria-pressed=true] .od{color:var(--fg)}
+.chk{display:flex;gap:12px;align-items:center;min-height:52px}
+.chk input{width:26px;height:26px;min-height:0;flex:none}
+.sheet h3{margin:4px 0 0;font-size:15px}
+.sheet dl{margin:0;display:grid;gap:10px}
+.sheet dt{font-weight:700}
+.sheet dd{margin:0;color:var(--muted);font-size:14px}
+.mrow{grid-template-columns:44px minmax(0,1fr) 46px 44px 40px}
+.mrow input{min-height:48px}
+.tg{min-height:44px;font-size:12px}
+
+.pvbox{position:relative;overflow:hidden;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:zoom-in;min-height:120px}
+.pvpaper{position:absolute;left:0;top:0;width:1414px;transform-origin:0 0;pointer-events:none}
+#pv{position:fixed;inset:0;z-index:70;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}
+.pvbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.pvst{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));touch-action:pan-x pan-y pinch-zoom}
+.pvin{position:relative;margin:0 auto;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.25)}
+.rolist{display:grid;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ror{display:grid;grid-template-columns:34px minmax(0,1fr) 40px 70px;gap:6px;align-items:center;padding:8px 10px;border-top:1px solid var(--line);font-size:14px}
+.ror:first-child{border-top:0}
+.ror b{font:700 20px var(--f-num);text-align:center}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 10px;font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:340px){.teams2,.fgrid{grid-template-columns:1fr}}
+</style>
+
+<header id="head"></header>
+<main id="main"></main>
+<nav id="nav" aria-label="画面切り替え"></nav>
+<div id="ov" hidden><div class="bd" data-a="close"></div><div class="sheet" id="sheet" role="dialog" aria-modal="true" tabindex="-1"></div></div>
+<div id="pv" hidden role="dialog" aria-modal="true" aria-label="記録用紙のプレビュー"><div class="pvbar"><button class="btn sm" data-a="pv-close">閉じる</button><button class="btn sm" data-a="pv-z" data-d="-1" aria-label="縮小">−</button><span id="pvz" class="muted"></span><button class="btn sm" data-a="pv-z" data-d="1" aria-label="拡大">＋</button><button class="btn sm" data-a="pv-fit">全体</button></div><div class="pvst" id="pvst"><div class="pvin" id="pvin"></div></div></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<input type="file" id="jf" accept=".json,application/json" hidden>
+<input type="file" id="rf" accept=".csv,.tsv,.txt,text/plain,text/csv" hidden>
+<input type="file" id="ri" accept="image/*" hidden>
+
+<script>
+(function(){
+'use strict';
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const KEY='rugby-record-v1',KEYP='rugby-record-prev',KEYT='rugby-record-tab';
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}};
+
+/* ---------- constants ---------- */
+const TY={T:{c:'T',n:'トライ',p:5},G:{c:'G',n:'ゴール',p:2},GX:{c:'G×',n:'ゴール失敗',p:0},PG:{c:'PG',n:'ペナルティゴール',p:3},PGX:{c:'PG×',n:'PG失敗',p:0},DG:{c:'DG',n:'ドロップゴール',p:3},DGX:{c:'DG×',n:'DG失敗',p:0},PT:{c:'PT',n:'ペナルティトライ',p:7}};
+const ORDER=['T','G','GX','PG','PGX','DG','DGX','PT'];
+const POS=['PR','HO','PR','LO','LO','FL','FL','No.8','SH','SO','WTB','CTB','CTB','WTB','FB'];
+const POSJ=['プロップ','フッカー','プロップ','ロック','ロック','フランカー','フランカー','ナンバーエイト','スクラムハーフ','スタンドオフ','ウイング','センター','センター','ウイング','フルバック'];
+const KINDS=[['T','トライ',5,'ボールをインゴール(得点エリア)に置いた'],['G','ゴール',2,'トライのあとに蹴るキック'],['PG','ペナルティゴール',3,'反則で得たキックが、ゴールに入った'],['DG','ドロップゴール',3,'プレー中にワンバウンドさせて蹴り、ゴールに入った'],['PT','ペナルティトライ',7,'反則がなければトライだった、とレフリーが認めた']];
+const TYN={T:'トライ',G:'ゴール成功',GX:'ゴール失敗',PG:'ペナルティゴール成功',PGX:'ペナルティゴール失敗',DG:'ドロップゴール成功',DGX:'ドロップゴール失敗',PT:'ペナルティトライ'};
+const baseOf=t=>String(t).replace(/X$/,'');
+const isKick=b=>b==='G'||b==='PG'||b==='DG';
+const GROUPS=[['フォワード 1〜8番',0,8],['ハーフ団 9・10番',8,10],['バックス 11〜14番',10,14],['フルバック 15番',14,15],['リザーブ 16〜23番',15,23]];
+const TABS=[['info','試合情報','<path d="M6 21V4M6 5h11l-2 4 2 4H6"/>'],['mem','メンバー','<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14.5c2.5 0 4 1.8 4 4.5"/>'],['rec','試合中','<path d="M8 4h8v3H8z"/><path d="M6 6H5v15h14V6h-1"/><path d="M9 12h6M9 16h4"/>'],['chg','交替・カード','<path d="M4 8h14l-3-3M20 16H6l3 3"/>'],['sum','提出','<path d="M21 3 3 10l7 3 3 7z"/><path d="M10 13 21 3"/>']];
+const halfL=h=>Number(h)===1?'前半':'後半';
+
+/* ---------- state ---------- */
+function today(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function blankRoster(){return Array.from({length:23},()=>({name:'',grade:'',cap:false,fr:false}));}
+function blankOff(){return{name:'',aff:'',kind:''};}
+function fresh(){return{v:1,seq:1,
+  info:{tournament:'東北地区大学ラグビーリーグ',date:today(),ko:'',venue:'',crowd:'',assoc:'',weather:'',ground:'',wind:'',kick1:'',notes:'',loss:''},
+  off:{ref:blankOff(),ar1:blankOff(),ar2:blankOff(),ar3:blankOff(),dr:blankOff(),mc:blankOff()},
+  scorer:{team:'',name:''},
+  teams:{h:{name:''},a:{name:''}},
+  roster:{h:blankRoster(),a:blankRoster()},
+  events:[],changes:[],cards:[],
+  fouls:{h:{1:{pk:0,fk:0},2:{pk:0,fk:0}},a:{1:{pk:0,fk:0},2:{pk:0,fk:0}}},
+  pts:{h:'',a:''},sig:{ref:'',mc:''},
+  clock:{half:1,acc:{1:0,2:0},start:null}};}
+function merge(base,src){
+  if(base===null||typeof base!=='object'||Array.isArray(base)) return src===undefined?base:src;
+  const out={...base};
+  if(src&&typeof src==='object') for(const k of Object.keys(src)) out[k]=(k in base)?merge(base[k],src[k]):src[k];
+  return out;}
+function load(){const s=ls.get(KEY); if(s){try{return merge(fresh(),JSON.parse(s));}catch(e){}} return fresh();}
+let S=load();
+let tab=ls.get(KEYT); if(!TABS.some(t=>t[0]===tab)) tab='info';
+let mt='h',draft=null,newArm=0,lastRm=null,saveOK=true,saveT=null;
+const caps={dl:null,sm:null,img:null};
+
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{saveOK=ls.set(KEY,JSON.stringify(S));const b=$('#sv');if(b)b.textContent=saveOK?'この端末に自動保存しています':'自動保存できません。バックアップを保存してください';},200);}
+function stash(){ls.set(KEYP,JSON.stringify(S));}
+const getPath=(o,p)=>p.split('.').reduce((a,k)=>a==null?a:a[k],o);
+function setPath(o,p,v){const ks=p.split('.');let a=o;for(let i=0;i<ks.length-1;i++)a=a[ks[i]];a[ks[ks.length-1]]=v;}
+const tn=t=>(S.teams[t].name||'').trim()||(t==='h'?'ホーム':'アウェイ');
+const sn=(t,n)=>{const p=S.roster[t][n-1];return p?String(p.name||'').trim().split(/[\s　]+/)[0]:'';};
+const previewName=(t,n)=>n===''||n==null?'':(n<1||n>23?'1〜23':sn(t,n));
+
+/* ---------- scoring ---------- */
+function sortedEvents(){return [...S.events].sort((a,b)=>a.half-b.half||a.min-b.min||a.id-b.id);}
+function calc(){
+  const cnt={h:{1:{},2:{}},a:{1:{},2:{}}},pts={h:{1:0,2:0},a:{1:0,2:0}},run={};let H=0,A=0;
+  for(const e of sortedEvents()){const p=TY[e.type].p;cnt[e.team][e.half][e.type]=(cnt[e.team][e.half][e.type]||0)+1;pts[e.team][e.half]+=p;if(e.team==='h')H+=p;else A+=p;run[e.id]=[H,A];}
+  return{cnt,pts,run,tot:{h:H,a:A}};}
+function tries(c,t){return [1,2].reduce((s,h)=>s+(c.cnt[t][h].T||0)+(c.cnt[t][h].PT||0),0);}
+function autoPts(c){const H=c.tot.h,A=c.tot.a;let h=0,a=0;if(H>A)h=4;else if(A>H)a=4;else{h=2;a=2;}
+  if(tries(c,'h')>=4)h++;if(tries(c,'a')>=4)a++;if(H<A&&A-H<=7)h++;if(A<H&&H-A<=7)a++;return{h,a};}
+
+/* ---------- clock ---------- */
+function halfMs(h){return (S.clock.acc[h]||0)+(S.clock.start&&Number(S.clock.half)===Number(h)?Date.now()-S.clock.start:0);}
+const fmt=ms=>{const s=Math.floor(ms/1000);return pad(Math.floor(s/60))+':'+pad(s%60);};
+function defMin(){const ms=halfMs(S.clock.half);return ms>0?Math.ceil(ms/60000):'';}
+function pauseClock(){if(S.clock.start){S.clock.acc[S.clock.half]=halfMs(S.clock.half);S.clock.start=null;}}
+let wl=null;
+async function wake(on){try{if(on&&navigator.wakeLock){wl=await navigator.wakeLock.request('screen');}else if(wl){await wl.release();wl=null;}}catch(e){}}
+setInterval(()=>{const el=$('#clk');if(el)el.textContent=fmt(halfMs(S.clock.half));},250);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&S.clock.start)wake(true);});
+
+/* ---------- small pieces ---------- */
+let toastT=null,toastActs=[];
+function toast(msg,acts,ms){const el=$('#toast');toastActs=acts||[];el.innerHTML='<span>'+esc(msg)+'</span>'+toastActs.map((a,i)=>'<button data-a="tact" data-i="'+i+'">'+esc(a.l)+'</button>').join('');el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true;},ms||2600);}
+async function copy(text,msg){try{await navigator.clipboard.writeText(text);toast(msg||'コピーしました');}catch(e){draft={k:'copy',text};showSheet();}}
+function fmtDate(iso){if(!iso)return '';const d=new Date(iso+'T00:00:00');if(isNaN(d))return iso;return d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日('+'日月火水木金土'[d.getDay()]+')';}
+function subject(){const tm=(S.scorer.team||'').trim()||tn('h');const d=S.info.date?S.info.date.slice(2).replace(/-/g,''):'試合日';return '【'+tm+'】'+d+'試合記録';}
+const byTime=(a,b)=>a.half-b.half||a.min-b.min||a.id-b.id;
+const isBlank=()=>!S.events.length&&!S.changes.length&&!S.cards.length&&!S.teams.h.name&&!S.teams.a.name&&!S.roster.h.some(p=>p.name)&&!S.roster.a.some(p=>p.name);
+
+/* ---------- header ---------- */
+const PLAY='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>',PAUSE='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>';
+function renderHead(){
+  const c=calc(),run=!!S.clock.start,hm=S.clock.half,started=halfMs(hm)>0;
+  $('#head').innerHTML='<div class="hin">'+
+   '<div class="hsc t-h"><span class="hn"><i class="chip">H</i><span class="ell">'+esc(tn('h'))+'</span></span><b class="bignum">'+c.tot.h+'</b></div>'+
+   '<button class="hclk" data-a="clk-adj" aria-label="時計の時間を合わせる"><span class="hl">'+halfL(hm)+'</span><span id="clk">'+fmt(halfMs(hm))+'</span></button>'+
+   '<div class="hsc t-a r"><span class="hn"><span class="ell">'+esc(tn('a'))+'</span><i class="chip">A</i></span><b class="bignum">'+c.tot.a+'</b></div>'+
+   '<div class="hctl"><div class="seg"><button class="sg" aria-pressed="'+(hm===1)+'" data-a="half" data-v="1">前半</button><button class="sg" aria-pressed="'+(hm===2)+'" data-a="half" data-v="2">後半</button></div><span class="sp"></span>'+
+   '<button class="btn '+(run?'':'primary')+'" data-a="clk">'+(run?PAUSE+'時計を止める':PLAY+(started?'時計を再開':'時計を始める'))+'</button>'+
+   '<button class="hbtn" data-a="help" aria-label="使い方と用語の説明">?</button></div></div>';
+}
+
+/* ---------- views ---------- */
+function fld(label,path,o){o=o||{};const id='f-'+path.replace(/\./g,'-');
+  return '<div class="f"><label class="lb" for="'+id+'">'+label+'</label><input id="'+id+'"'+(o.type?' type="'+o.type+'"':'')+(o.mode?' inputmode="'+o.mode+'"':'')+' data-bind="'+path+'" value="'+esc(getPath(S,path))+'"'+(o.ph?' placeholder="'+esc(o.ph)+'"':'')+' autocomplete="off"></div>';}
+function segF(label,path,opts){const v=getPath(S,path);
+  return '<div class="f"><span class="lb">'+label+'</span><div class="seg wrap">'+opts.map(o=>'<button class="sg" aria-pressed="'+(v===o)+'" data-a="set" data-p="'+path+'" data-v="'+esc(o)+'">'+esc(o)+'</button>').join('')+'</div></div>';}
+
+function evRow(e,c){const r=c.run[e.id],T=TY[e.type];
+  const who=e.no?'#'+e.no+' '+esc(sn(e.team,e.no)):'<em class="warnt">背番号なし</em>';
+  return '<button class="row ev t-'+e.team+'" data-a="ev-edit" data-id="'+e.id+'"><span class="tm">'+(e.half===1?'前':'後')+'<b>'+e.min+'</b>′</span>'+
+   '<span class="evm"><span class="l1"><i class="chip">'+(e.team==='h'?'H':'A')+'</i>'+esc(tn(e.team))+'</span><span class="l2">'+TYN[e.type]+(T.p?' +'+T.p+'点':'')+'</span><span class="l3">'+who+'</span></span>'+
+   '<span class="rs"><span class="h">'+r[0]+'</span>–<span class="a">'+r[1]+'</span></span></button>';}
+
+function viewRec(){
+  const c=calc(),ev=sortedEvents().reverse(),hm=S.clock.half,idle=!S.clock.start&&halfMs(hm)===0;
+  const tb=t=>'<div class="tblk t-'+t+'"><div class="tph"><i class="chip">'+(t==='h'?'H':'A')+'</i><span class="ell">'+esc(tn(t))+'</span></div>'+
+    '<button class="tryb" data-a="score" data-t="'+t+'" data-y="T">トライ<small>5点</small></button>'+
+    '<button class="othb" data-a="score" data-t="'+t+'" data-y="">ほかの得点<small>キックなど</small></button></div>';
+  const foul=t=>{const f=S.fouls[t][hm];return '<div class="fteam2 t-'+t+'"><b class="ell">'+esc(tn(t))+'</b>'+[['pk','ペナルティキック(PK)'],['fk','フリーキック(FK)']].map(a=>'<div><span class="fl">'+a[1]+'</span><div class="fr2"><button class="sq" data-a="foul" data-t="'+t+'" data-k="'+a[0]+'" data-d="-1" aria-label="'+a[1]+'を1つ減らす">−</button><output>'+f[a[0]]+'</output><button class="sq add" data-a="foul" data-t="'+t+'" data-k="'+a[0]+'" data-d="1" aria-label="'+a[1]+'を1つ増やす">＋</button></div></div>').join('')+'</div>';};
+  const guide=ev.length?'':'<div class="guide"><b>試合中の使い方</b><ol class="steps"><li>キックオフで、上の「時計を始める」を押します。</li><li>得点が入ったら、点を取ったチームのボタンを押します。</li><li>反則があったら、下の「反則を数える」で＋を押します。</li></ol><button class="btn sm" data-a="help">用語の説明を見る</button></div>';
+  const clk=(ev.length&&idle)?'<div class="note"><p>'+halfL(hm)+'のキックオフで「時計を始める」を押すと、時間が自動で入ります。</p></div>':'';
+  const setup=(!S.teams.h.name&&!S.teams.a.name)?'<div class="note"><p>チーム名とメンバーを入れておくと、得点に選手名が出ます。</p><button class="btn sm" data-a="tab" data-v="mem">メンバーを入力</button></div>':'';
+  const empty='<div class="empty"><p><b>得点はまだありません。</b></p><p>得点が入ったら、上のチームのボタンを押してください。</p>'+(isBlank()?'<button class="btn sm" data-a="sample">見本の試合を入れて試す</button>':'')+'</div>';
+  return '<section class="page">'+guide+setup+clk+'<div class="teams2">'+tb('h')+tb('a')+'</div>'+
+   '<div class="panel"><div class="ph"><h2>得点の記録</h2><button class="btn sm" data-a="undo"'+(ev.length?'':' disabled')+'>直前を取り消す</button></div><div>'+(ev.length?ev.map(e=>evRow(e,c)).join(''):empty)+'</div>'+(ev.length?'<p class="hint">まちがえたときは、行を押すと直せます。</p>':'')+'</div>'+
+   '<div class="panel"><div class="ph"><h2>反則を数える('+halfL(hm)+')</h2></div><p class="hint">レフリーが反則を取ったら、そのチームの＋を押します。</p><div class="fgrid">'+foul('h')+foul('a')+'</div></div></section>';
+}
+
+function chgRow(x){
+  const nm=n=>n?'#'+n+(sn(x.team,n)?' '+esc(sn(x.team,n)):''):'—';
+  const kd={sub:'交替',swap:'入替',temp:'一時的退場'}[x.kind];
+  let l2=nm(x.out)+' → '+nm(x.in),l3='';
+  if(x.kind==='temp'){const r=x.reason==='その他'?(x.rtext||'その他'):x.reason;l3=esc(r||'')+(x.rmin!==''&&x.rmin!=null?' ・ 復帰 '+(Number(x.rhalf)===1?'前':'後')+x.rmin+'′':' ・ 復帰の時間なし');}
+  return '<button class="row cr t-'+x.team+'" data-a="chg-edit" data-id="'+x.id+'"><span class="tm">'+(x.half===1?'前':'後')+'<b>'+x.min+'</b>′</span><span><span class="l1"><i class="chip">'+(x.team==='h'?'H':'A')+'</i>'+esc(tn(x.team))+' '+kd+(x.conc?'<span class="conc">脳振盪 ×</span>':'')+'</span><span class="l2">'+l2+'</span>'+(l3?'<span class="l3">'+l3+'</span>':'')+'</span></button>';}
+function cardRow(x){
+  const ret=x.color==='y'?'<span class="l3">10分間の退場 → '+(Number(x.half)===1?'前':'後')+(x.min+10)+'′ に復帰</span>':'';
+  return '<button class="row cr t-'+x.team+'" data-a="card-edit" data-id="'+x.id+'"><span class="tm">'+(x.half===1?'前':'後')+'<b>'+x.min+'</b>′</span><span><span class="l1"><i class="chip">'+(x.team==='h'?'H':'A')+'</i><i class="cardi '+x.color+'"></i>'+esc(tn(x.team))+' '+(x.color==='y'?'イエロー':'レッド')+'</span><span class="l2">#'+x.no+(sn(x.team,x.no)?' '+esc(sn(x.team,x.no)):'')+(x.text?' ・ '+esc(x.text):'')+'</span>'+ret+'</span></button>';}
+function viewChg(){
+  const ch=[...S.changes].sort(byTime),cd=[...S.cards].sort(byTime);
+  return '<section class="page"><div class="panel"><div class="ph"><h2>選手の入れ替え</h2></div><p class="hint">選手が入れ替わったときに記録します。けがで替わるのが「交替」、作戦で替わるのが「入替」です。出血などで一時的に出る場合は「一時的退場」を使います。</p><div class="btnrow"><button class="btn primary lg" data-a="chg-add" data-k="sub">＋ 交替・入替</button><button class="btn lg" data-a="chg-add" data-k="temp">＋ 一時的退場</button></div>'+
+   (ch.length?'<div>'+ch.map(chgRow).join('')+'</div>':'<p class="empty">まだ記録はありません。</p>')+
+   '<p class="hint">一時的に替わったあとで、正式な交替になったときは「交替・入替」を追加します(例: 16番 → 2番)。</p></div>'+
+   '<div class="panel"><div class="ph"><h2>カード</h2></div><p class="hint">レフリーがカードを出したときに記録します。</p><div class="btnrow"><button class="btn lg" data-a="card-add" data-c="y"><i class="cardi y"></i>イエロー</button><button class="btn lg" data-a="card-add" data-c="r"><i class="cardi r"></i>レッド</button></div>'+
+   (cd.length?'<div>'+cd.map(cardRow).join('')+'</div>':'<p class="empty">まだ記録はありません。</p>')+'</div></section>';
+}
+
+function nextBtn(v,label){return '<button class="btn primary lg" data-a="tab" data-v="'+v+'">'+label+'</button>';}
+function viewMem(){
+  const t=mt,r=S.roster[t];
+  const row=i=>{const p=r[i],n=i+1;return '<div class="mrow"><div class="no"><b>'+n+'</b><small>'+(POS[i]||'控え')+'</small></div>'+
+   '<input data-bind="roster.'+t+'.'+i+'.name" placeholder="'+esc(POSJ[i]||'リザーブ')+'" autocomplete="off" value="'+esc(p.name)+'" aria-label="'+n+'番 氏名">'+
+   '<input class="gr" data-bind="roster.'+t+'.'+i+'.grade" inputmode="numeric" maxlength="2" placeholder="学年" autocomplete="off" value="'+esc(p.grade)+'" aria-label="'+n+'番 学年">'+
+   '<button class="tg" data-a="cap" data-i="'+i+'" aria-pressed="'+p.cap+'" aria-label="'+n+'番 ゲームキャプテン">主将</button>'+
+   '<button class="tg" data-a="fr" data-i="'+i+'" aria-pressed="'+p.fr+'" aria-label="'+n+'番 フロントロー適合">FR</button></div>';};
+  return '<section class="page t-'+t+'"><div class="seg big">'+['h','a'].map(x=>'<button class="sg t-'+x+'" aria-pressed="'+(mt===x)+'" data-a="mt" data-v="'+x+'">'+esc(tn(x))+'</button>').join('')+'</div>'+
+   fld('チーム名','teams.'+t+'.name')+
+   '<button class="btn lg" data-a="ro-open">メンバー表から読み取る</button><div class="note"><p>氏名は「苗字 名前」の順に入れます。得点の記録には苗字だけが出ます。学年は数字だけで大丈夫です。<br><b>主将</b>はゲームキャプテン、<b>FR</b>はフロントロー(1・2・3番)ができる選手に付けます。わからなければ空欄で構いません。</p></div>'+
+   GROUPS.map(g=>'<div class="panel"><div class="ph"><h2>'+g[0]+'</h2></div>'+Array.from({length:g[2]-g[1]},(_,k)=>row(g[1]+k)).join('')+'</div>').join('')+
+   (mt==='h'?'<button class="btn lg" data-a="mt" data-v="a">次へ: '+esc(tn('a'))+' のメンバーを入力</button>':nextBtn('rec','次へ: 試合の記録をはじめる'))+'</section>';
+}
+
+function offRow(label,key,mode){
+  const o=S.off[key];let second='',kind='';
+  if(mode==='ref')second='<input data-bind="info.assoc" placeholder="協会名(例: 東北)" autocomplete="off" value="'+esc(S.info.assoc)+'" aria-label="'+label+' 協会名">';
+  if(mode==='ar'){second='<input data-bind="off.'+key+'.aff" placeholder="協会名 または 大学名" autocomplete="off" value="'+esc(o.aff)+'" aria-label="'+label+' 所属">';
+    kind='<div class="seg wrap">'+[['協会公認','協会公認の方'],['大学','大学の方']].map(k=>'<button class="sg" aria-pressed="'+(o.kind===k[0])+'" data-a="set" data-p="off.'+key+'.kind" data-v="'+k[0]+'">'+k[1]+'</button>').join('')+'</div>';}
+  return '<div class="f"><span class="lb">'+label+'</span><div class="two"><input data-bind="off.'+key+'.name" placeholder="氏名" autocomplete="off" value="'+esc(o.name)+'" aria-label="'+label+' 氏名">'+second+'</div>'+kind+'</div>';}
+function viewInfo(){
+  const k1=S.info.kick1,k2=k1==='h'?'a':k1==='a'?'h':'';
+  return '<section class="page"><div class="note"><p><b>試合の前に入れておくこと</b><br>わかるところだけで大丈夫です。あとからいつでも直せます。</p><button class="btn sm" data-a="help">使い方</button></div><div class="panel"><div class="ph"><h2>試合</h2></div>'+fld('大会名','info.tournament')+
+   '<div class="grid">'+fld('対戦日','info.date',{type:'date'})+fld('キックオフ','info.ko',{type:'time'})+'</div>'+
+   '<div class="grid">'+fld('競技場','info.venue')+fld('観客数(人)','info.crowd',{type:'number',mode:'numeric'})+'</div></div>'+
+   '<div class="panel"><div class="ph"><h2>チーム</h2></div><div class="grid">'+fld('ホームのチーム名','teams.h.name')+fld('アウェイのチーム名','teams.a.name')+'</div>'+
+   '<div class="f"><span class="lb">前半キックオフ</span><div class="seg wrap">'+['h','a'].map(t=>'<button class="sg t-'+t+'" aria-pressed="'+(k1===t)+'" data-a="set" data-p="info.kick1" data-v="'+t+'">'+esc(tn(t))+'</button>').join('')+'</div>'+(k2?'<p class="hint">後半は '+esc(tn(k2))+' のキックオフです。</p>':'')+'</div></div>'+
+   '<div class="panel"><div class="ph"><h2>天候・グラウンド</h2></div>'+segF('天候','info.weather',['晴れ','曇り','雨','雪'])+segF('グラウンド状態','info.ground',['良い','やや良い','やや悪い','悪い'])+segF('風','info.wind',['無風','微風','弱風','強風'])+'</div>'+
+   '<div class="panel"><div class="ph"><h2>審判・関係者</h2></div>'+offRow('レフリー','ref','ref')+offRow('アシスタントレフリー 1','ar1','ar')+offRow('アシスタントレフリー 2','ar2','ar')+offRow('アシスタントレフリー 3','ar3','ar')+offRow('ドクター','dr','name')+offRow('マッチコミッショナー','mc','name')+
+   '<div class="f"><span class="lb">記録係</span><div class="two"><input data-bind="scorer.team" placeholder="チーム名" autocomplete="off" value="'+esc(S.scorer.team)+'" aria-label="記録係 チーム名"><input data-bind="scorer.name" placeholder="氏名" autocomplete="off" value="'+esc(S.scorer.name)+'" aria-label="記録係 氏名"></div><p class="hint">記録係のチーム名は、提出メールの件名に使います。</p></div></div>'+
+   '<div class="panel"><div class="ph"><h2>特記事項</h2></div><textarea id="f-notes" data-bind="info.notes" placeholder="例: ウォーターブレイク 前半20分 / 後半20分">'+esc(S.info.notes)+'</textarea></div>'+nextBtn('mem','次へ: メンバーを入力')+'</section>';
+}
+
+function scoreTable(c){
+  const cell=(t,h,k)=>c.cnt[t][h][k]||0;
+  return '<div class="ox"><table class="st"><thead><tr><th></th><th colspan="2" class="t-h">'+esc(tn('h'))+'</th><th colspan="2" class="t-a">'+esc(tn('a'))+'</th></tr><tr><th></th><th>前半</th><th>後半</th><th>前半</th><th>後半</th></tr></thead><tbody>'+
+   ['T','G','PT','PG','DG'].map(k=>'<tr><th>'+k+'</th><td>'+cell('h',1,k)+'</td><td>'+cell('h',2,k)+'</td><td>'+cell('a',1,k)+'</td><td>'+cell('a',2,k)+'</td></tr>').join('')+
+   '<tr><th>計(点)</th><td>'+c.pts.h[1]+'</td><td>'+c.pts.h[2]+'</td><td>'+c.pts.a[1]+'</td><td>'+c.pts.a[2]+'</td></tr><tr class="tot"><th>合計</th><td colspan="2">'+c.tot.h+'</td><td colspan="2">'+c.tot.a+'</td></tr></tbody></table></div>';}
+function foulTable(){const f=(t,h,k)=>S.fouls[t][h][k];
+  return '<div class="ox"><table class="st"><thead><tr><th></th><th colspan="2" class="t-h">'+esc(tn('h'))+'</th><th colspan="2" class="t-a">'+esc(tn('a'))+'</th></tr><tr><th>反則</th><th>前半</th><th>後半</th><th>前半</th><th>後半</th></tr></thead><tbody>'+
+   ['pk','fk'].map(k=>'<tr><th>'+k.toUpperCase()+'</th><td>'+f('h',1,k)+'</td><td>'+f('h',2,k)+'</td><td>'+f('a',1,k)+'</td><td>'+f('a',2,k)+'</td></tr>').join('')+'</tbody></table></div>';}
+
+function checks(){
+  const I=S.info,o=S.off,first=t=>S.roster[t].slice(0,15).filter(p=>p.name.trim()).length,cap=t=>S.roster[t].some(p=>p.cap);
+  return [
+   {ok:!!I.tournament.trim()&&!!I.date,l:'大会名・対戦日',tab:'info'},
+   {ok:!!I.ko,l:'キックオフ時刻',tab:'info'},
+   {ok:!!I.venue.trim(),l:'競技場',tab:'info'},
+   {ok:String(I.crowd).trim()!=='',l:'観客数',tab:'info'},
+   {ok:!!(I.weather&&I.ground&&I.wind),l:'天候・グラウンド状態・風',tab:'info'},
+   {ok:!!I.kick1,l:'前半キックオフのチーム',tab:'info'},
+   {ok:!!S.teams.h.name.trim()&&!!S.teams.a.name.trim(),l:'両チームの名前',tab:'info'},
+   {ok:!!o.ref.name.trim(),l:'レフリー',tab:'info'},
+   {ok:!!S.scorer.name.trim()&&!!S.scorer.team.trim(),l:'記録係(チーム名・氏名)',tab:'info'},
+   {ok:first('h')===15,l:tn('h')+' 先発1〜15番の氏名('+first('h')+'/15)',tab:'mem',t:'h'},
+   {ok:first('a')===15,l:tn('a')+' 先発1〜15番の氏名('+first('a')+'/15)',tab:'mem',t:'a'},
+   {ok:cap('h')&&cap('a'),l:'ゲームキャプテン(両チーム)',tab:'mem',t:cap('h')?'a':'h'},
+   {ok:!!S.sig.ref&&(!!S.sig.mc||!o.mc.name.trim()),l:'サイン(レフリー・マッチコミッショナー)',tab:'sum'}];}
+
+function sigBlock(k,label){return '<div class="sig"><div class="top"><span class="lb">'+label+'</span><button class="btn sm" data-a="sig-clear" data-k="'+k+'">書き直す</button></div><canvas id="pad-'+k+'" aria-label="'+label+'のサイン"></canvas></div>';}
+function pointsField(t){return '<div class="f t-'+t+'"><label class="lb" for="pts-'+t+'">'+esc(tn(t))+' の勝ち点</label><input id="pts-'+t+'" type="number" inputmode="numeric" data-bind="pts.'+t+'" value="'+esc(S.pts[t])+'"></div>';}
+function viewSum(){
+  const c=calc(),ck=checks(),miss=ck.filter(x=>!x.ok).length,au=autoPts(c);
+  const hasPrev=!!ls.get(KEYP);
+  return '<section class="page">'+
+   '<div class="panel res"><div class="ph"><h2>1. 結果を確認</h2></div><div class="line"><span class="t-h">'+esc(tn('h'))+'</span><b class="t-h">'+c.tot.h+'</b><span>–</span><b class="t-a">'+c.tot.a+'</b><span class="t-a">'+esc(tn('a'))+'</span></div>'+scoreTable(c)+'</div>'+
+   '<div class="panel"><div class="ph"><h2>2. ロスタイムと勝ち点を入力</h2></div>'+foulTable()+'<p class="hint">反則の数は「記録」画面で数えます。</p>'+
+   '<div class="two">'+fld('ロスタイム(分)','info.loss',{type:'number',mode:'numeric'})+'</div><div class="two">'+pointsField('h')+pointsField('a')+'</div>'+
+   '<div class="btnrow"><button class="btn sm" data-a="autopts">勝ち点を自動入力('+au.h+' / '+au.a+')</button></div><p class="hint">自動入力は一般的な勝ち点(勝ち4・引き分け2、4トライ以上+1、7点差以内の負け+1)で計算します。リーグの規定に合わせて修正してください。勝ち点制でないリーグは空欄のままにします。</p></div>'+
+   '<div class="panel"><div class="ph"><h2>3. 記入漏れを確認</h2><span class="pill '+(miss?'warn':'ok')+'">'+(miss?miss+'件':'すべてOK')+'</span></div><div>'+
+   ck.map(x=>'<button class="ckr" data-a="goto" data-tab="'+x.tab+'"'+(x.t?' data-t="'+x.t+'"':'')+'><i class="dot '+(x.ok?'ok':'no')+'">'+(x.ok?'✓':'')+'</i><span>'+esc(x.l)+'</span></button>').join('')+'</div></div>'+
+   '<div class="panel"><div class="ph"><h2>4. 記録用紙を確認</h2></div><p class="hint">提出する用紙と同じ様式です。内容を確認してから、サインをもらいます。タップすると拡大できます。</p><div class="pvbox" id="pvbox" data-a="pv" role="button" tabindex="0" aria-label="記録用紙を拡大して見る"></div><div class="btnrow"><button class="btn primary lg" data-a="pv">拡大して確認する</button></div></div><div class="panel"><div class="ph"><h2>5. サインをもらう</h2></div><p class="hint">内容を確認してもらってから、サインをもらいます。マッチコミッショナーがいないリーグは、レフリーのサインだけです。</p>'+sigBlock('ref','レフリー')+sigBlock('mc','マッチコミッショナー')+'</div>'+
+   '<div class="panel"><div class="ph"><h2>6. 提出する</h2></div>'+
+   '<div class="f"><span class="lb">宛先メール</span><div class="cb"><code>rugby.gakusei.tohoku@gmail.com</code><button class="btn sm" data-a="copy" data-w="to">コピー</button></div></div>'+
+   '<div class="f"><span class="lb">件名</span><div class="cb"><code>'+esc(subject())+'</code><button class="btn sm" data-a="copy" data-w="subj">コピー</button></div></div>'+
+   '<div class="btnrow">'+(caps.dl?'<button class="btn primary lg" data-a="save-pdf">記録用紙をPDFで保存</button><button class="btn lg" data-a="save-html">HTMLで保存</button>':'')+'<button class="btn lg" data-a="copy" data-w="body">記録をテキストでコピー</button></div>'+
+   '<p class="hint">PDFを保存して、メールに添付して送ります。PDFが作れないときは、HTMLを保存してパソコンで開き、印刷からPDFにできます。送付先は用紙に書かれているものと同じです。</p></div>'+
+   '<div class="panel"><div class="ph"><h2>データ</h2></div><p class="hint" id="sv">'+(saveOK?'この端末に自動保存しています':'自動保存できません。バックアップを保存してください')+'</p>'+
+   '<div class="btnrow">'+(caps.dl?'<button class="btn sm" data-a="save-json">バックアップを保存</button>':'')+'<button class="btn sm" data-a="copy" data-w="json">バックアップをコピー</button><button class="btn sm" data-a="load">ファイルから読み込む</button><button class="btn sm" data-a="paste">貼り付けて読み込む</button></div>'+
+   '<div class="btnrow"><button class="btn sm '+(newArm?'danger':'')+'" data-a="new">'+(newArm?'本当に新しい試合にする':'新しい試合を始める')+'</button>'+(hasPrev?'<button class="btn sm" data-a="prev">直前の試合に戻す</button>':'')+'</div>'+
+   '<p class="hint">新しい試合を始めても、いまの記録は「直前の試合」として1試合分だけ残ります。</p></div></section>';
+}
+
+function render(){
+  const v={rec:viewRec,chg:viewChg,mem:viewMem,info:viewInfo,sum:viewSum}[tab];
+  $('#main').innerHTML=v();
+  $$('#nav button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===tab?'page':'false'));
+  if(tab==='sum'){initPads();mountPreview();}
+}
+
+/* ---------- signature pads ---------- */
+function initPads(){['ref','mc'].forEach(k=>{
+  const cv=$('#pad-'+k);if(!cv)return;
+  const dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;
+  cv.width=Math.max(1,w*dpr);cv.height=Math.max(1,h*dpr);
+  const g=cv.getContext('2d');g.scale(dpr,dpr);g.fillStyle='#fff';g.fillRect(0,0,w,h);g.lineWidth=2.4;g.lineCap='round';g.lineJoin='round';g.strokeStyle='#111';
+  if(S.sig[k]){const im=new Image();im.onload=()=>g.drawImage(im,0,0,w,h);im.src=S.sig[k];}
+  let dr=false,moved=false,lx=0,ly=0;
+  const pt=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top];};
+  cv.addEventListener('pointerdown',e=>{dr=true;moved=false;try{cv.setPointerCapture(e.pointerId);}catch(x){}[lx,ly]=pt(e);e.preventDefault();});
+  cv.addEventListener('pointermove',e=>{if(!dr)return;const[x,y]=pt(e);g.beginPath();g.moveTo(lx,ly);g.lineTo(x,y);g.stroke();lx=x;ly=y;moved=true;});
+  const end=()=>{if(!dr)return;dr=false;if(moved){S.sig[k]=cv.toDataURL('image/png');save();refreshChecks();}};
+  cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+});}
+function refreshChecks(){if(tab==='sum'){const y=window.scrollY;render();window.scrollTo(0,y);}}
+
+/* ---------- sheets ---------- */
+function teamSeg(){return '<div class="seg big">'+['h','a'].map(t=>'<button class="sg t-'+t+'" aria-pressed="'+(draft.team===t)+'" data-a="d-set" data-k="team" data-v="'+t+'">'+esc(tn(t))+'</button>').join('')+'</div>';}
+function stp(n,text){return '<div class="sh"><b>'+n+'</b><span>'+text+'</span></div>';}
+function timeField(hk,mk,label,hint){const d=draft;
+  return '<div class="f">'+(label?'<span class="lb">'+label+'</span>':'')+'<div class="timerow"><div class="seg">'+[1,2].map(h=>'<button class="sg" aria-pressed="'+(Number(d[hk])===h)+'" data-a="d-set" data-k="'+hk+'" data-n="1" data-v="'+h+'">'+halfL(h)+'</button>').join('')+'</div>'+
+   '<div class="step"><button data-a="d-step" data-k="'+mk+'" data-d="-1" aria-label="1分戻す">−</button><input type="number" inputmode="numeric" min="0" max="120" id="d-'+mk+'" data-bind="d.'+mk+'" data-num value="'+esc(d[mk])+'" aria-label="分"><span>分</span><button data-a="d-step" data-k="'+mk+'" data-d="1" aria-label="1分進める">＋</button></div></div>'+(hint?'<p class="hint">'+hint+'</p>':'')+'</div>';}
+function numGrid(key){const d=draft,v=d[key];
+  return '<div class="f"><span class="lb">背番号を押して選びます'+(v?'(選択中: #'+v+' '+esc(sn(d.team,v))+')':'')+'</span><div class="numgrid">'+Array.from({length:23},(_,i)=>{const n=i+1,nm=sn(d.team,n);return '<button class="nb" aria-pressed="'+(v===n)+'" data-a="d-no" data-k="'+key+'" data-v="'+n+'"><b>'+n+'</b><small>'+esc(nm||POS[i]||'控え')+'</small></button>';}).join('')+'</div></div>';}
+function actions(saveA,label){const d=draft;
+  return '<div class="actions">'+(d.id?'<button class="btn danger" data-a="del">'+(d.cd?'もう一度押すと削除':'削除')+'</button>':'')+'<span class="sp"></span><button class="btn" data-a="close">やめる</button><button class="btn primary" data-a="'+saveA+'">'+(d.id?'更新する':(label||'記録する'))+'</button></div>';}
+
+function sheetScore(){const d=draft,K=KINDS.find(k=>k[0]===d.base),kick=isKick(d.base),pt=d.base==='PT';
+  return '<h2>'+(d.id?'得点を直す':'得点を記録')+'</h2><div class="f"><span class="lb">チーム</span>'+teamSeg()+'</div>'+
+   stp(1,'何が入りましたか')+
+   '<div class="opts">'+KINDS.map(k=>'<button class="opt" aria-pressed="'+(d.base===k[0])+'" data-a="d-set" data-k="base" data-v="'+k[0]+'"><span class="on">'+k[1]+'</span><span class="op">'+k[2]+'点</span><span class="od">'+k[3]+'</span></button>').join('')+'</div>'+
+   (kick?'<div class="f"><span class="lb">キックは決まりましたか</span><div class="seg big"><button class="sg" aria-pressed="'+d.ok+'" data-a="d-ok" data-v="1">決まった('+K[2]+'点)</button><button class="sg" aria-pressed="'+!d.ok+'" data-a="d-ok" data-v="0">外れた(0点)</button></div></div>':'')+
+   (pt?'<p class="hint">ペナルティトライは、背番号なしで記録します。</p>':stp(2,'だれが決めましたか')+numGrid('no')+'<p class="hint">わからないときは選ばずに記録できます。あとから一覧で直せます。</p>')+
+   stp(pt?2:3,'何分ですか')+timeField('half','min','','時計を動かしていれば、自動で入っています。')+
+   actions('sd-save');}
+function sheetChg(){const d=draft,temp=d.kind==='temp';
+  const kinds=[['sub','交替','けがなどで、選手が入れ替わる'],['swap','入替','作戦で、選手を入れ替える'],['temp','一時的退場','出血などで、選手が一時的にグラウンドを出る']];
+  return '<h2>'+(d.id?'入れ替えを直す':'入れ替えを記録')+'</h2><div class="f"><span class="lb">チーム</span>'+teamSeg()+'</div>'+
+   stp(1,'どれですか')+'<div class="opts">'+kinds.map(k=>'<button class="opt" aria-pressed="'+(d.kind===k[0])+'" data-a="d-set" data-k="kind" data-v="'+k[0]+'"><span class="on">'+k[1]+'</span><span class="od">'+k[2]+'</span></button>').join('')+'</div>'+
+   stp(2,temp?'いつ出ましたか':'何分ですか')+timeField('half','min','')+
+   stp(3,temp?'出た選手':'グラウンドを出る選手')+numGrid('out')+
+   stp(4,temp?'代わりに入った選手(いなければ選びません)':'グラウンドに入る選手')+numGrid('in')+
+   (temp?stp(5,'いつ戻りましたか')+timeField('rhalf','rmin','','わからなければ、空欄のままで大丈夫です。')+stp(6,'理由')+'<div class="seg wrap">'+['出血','フロントローシービン','その他'].map(r=>'<button class="sg" aria-pressed="'+(d.reason===r)+'" data-a="d-set" data-k="reason" data-v="'+r+'">'+r+'</button>').join('')+'</div>'+(d.reason==='その他'?'<input id="d-rtext" data-bind="d.rtext" placeholder="理由を入れてください" value="'+esc(d.rtext)+'" aria-label="理由">':''):
+   '<label class="chk"><input type="checkbox" id="d-conc" data-bind="d.conc"'+(d.conc?' checked':'')+'><span>脳しんとう(またはその疑い)のため<br><small class="muted">用紙の×印に当たります</small></span></label>')+
+   actions('ch-save');}
+function sheetCard(){const d=draft;
+  return '<h2>'+(d.id?'カードを直す':'カードを記録')+'</h2><div class="f"><span class="lb">チーム</span>'+teamSeg()+'</div>'+
+   stp(1,'どのカードですか')+'<div class="opts">'+[['y','イエローカード','10分間、一時的に退場します'],['r','レッドカード','その試合は退場します']].map(a=>'<button class="opt" aria-pressed="'+(d.color===a[0])+'" data-a="d-set" data-k="color" data-v="'+a[0]+'"><span class="on"><i class="cardi '+a[0]+'"></i> '+a[1]+'</span><span class="od">'+a[2]+'</span></button>').join('')+'</div>'+
+   stp(2,'何分ですか')+timeField('half','min','')+
+   stp(3,'だれですか')+numGrid('no')+
+   stp(4,'理由(わかれば)')+'<div class="f"><input id="d-text" data-bind="d.text" value="'+esc(d.text)+'" placeholder="反則の内容" autocomplete="off"><div class="seg wrap">'+['反則の繰り返し','危険なタックル','ハイタックル','故意のノックオン','抗議'].map(t=>'<button class="sg" data-a="d-text" data-v="'+t+'">'+t+'</button>').join('')+'</div></div>'+
+   actions('cd-save');}
+function sheetHelp(){
+  const dl=[['トライ(5点)','ボールをインゴール(得点エリア)に置くこと。'],['ゴール(2点)','トライのあとに蹴るキック。決まると2点。'],['ペナルティゴール(3点)','反則で得たキックが、ゴールに入ったとき。'],['ドロップゴール(3点)','プレー中にボールをワンバウンドさせて蹴り、ゴールに入ったとき。'],['ペナルティトライ(7点)','反則がなければトライだった、とレフリーが認めたとき。'],['PK・FK','反則の種類です。PKはペナルティキック、FKはフリーキック。'],['交替・入替','けがでの入れ替えが「交替」、作戦での入れ替えが「入替」。'],['一時的退場','出血などで、選手が一時的にグラウンドを出ること。'],['イエロー・レッド','イエローは10分間の退場、レッドはその試合の退場。'],['FR','フロントロー(1・2・3番)ができる選手。用紙の〇に当たります。'],['ロスタイム','試合の終わりに追加された時間(分)。']];
+  return '<h2>はじめての方へ</h2><ol class="steps"><li><b>試合の前</b> 「試合情報」と「メンバー」を入れます。わかるところだけで大丈夫です。</li><li><b>試合中</b> キックオフで「時計を始める」を押します。得点が入ったら「試合中」のチームのボタンを押して、種類・背番号・時間を選びます。</li><li><b>試合のあと</b> 「提出」で記入もれを確認し、サインをもらって送ります。</li></ol><p class="hint">まちがえたときは、一覧の行を押すと直せます。入力した内容は、この端末に自動で保存されます。</p><h3>ことばの説明</h3><dl>'+dl.map(x=>'<div><dt>'+x[0]+'</dt><dd>'+x[1]+'</dd></div>').join('')+'</dl><div class="actions"><span class="sp"></span><button class="btn primary" data-a="close">とじる</button></div>';}
+function sheetClock(){return '<h2>時計を合わせる('+halfL(S.clock.half)+')</h2><div class="timerow"><div class="step"><input id="d-cm" type="number" inputmode="numeric" min="0" data-bind="d.cm" data-num value="'+esc(draft.cm)+'" aria-label="分"><span>分</span></div><div class="step"><input id="d-cs" type="number" inputmode="numeric" min="0" max="59" data-bind="d.cs" data-num value="'+esc(draft.cs)+'" aria-label="秒"><span>秒</span></div></div><p class="hint">試合の時間に合わせて入力します。動いている時計は、そのまま続きます。</p><div class="actions"><button class="btn" data-a="clk-zero">0:00に戻す</button><span class="sp"></span><button class="btn" data-a="close">キャンセル</button><button class="btn primary" data-a="clk-set">設定</button></div>';}
+function sheetCopy(){return '<h2>選択してコピーしてください</h2><p class="hint">自動でコピーできませんでした。下の文章を長押しして選択し、コピーしてください。</p><textarea id="ct" readonly rows="10">'+esc(draft.text)+'</textarea><div class="actions"><span class="sp"></span><button class="btn primary" data-a="close">閉じる</button></div>';}
+function sheetPaste(){return '<h2>バックアップを貼り付けて読み込む</h2><p class="hint">「バックアップをコピー」で取ったテキストを貼り付けます。いまの記録は「直前の試合」に残ります。</p><textarea id="pt" rows="8" placeholder="ここに貼り付け"></textarea><div class="actions"><span class="sp"></span><button class="btn" data-a="close">キャンセル</button><button class="btn primary" data-a="paste-load">読み込む</button></div>';}
+
+function renderSheet(){const sh=$('#sheet'),st=sh.scrollTop;sh.className='sheet t-'+(draft.team||'h');sh.innerHTML={score:sheetScore,chg:sheetChg,card:sheetCard,clock:sheetClock,copy:sheetCopy,paste:sheetPaste,help:sheetHelp,roster:sheetRoster}[draft.k]();sh.scrollTop=st;}
+function showSheet(){renderSheet();$('#ov').hidden=false;const sh=$('#sheet');sh.scrollTop=0;sh.focus();if(draft.k==='copy'){const ta=$('#ct');ta.focus();ta.select();}}
+function closeSheet(){if(roCtl)roCtl.abort();$('#ov').hidden=true;draft=null;}
+function updatePreviews(){$$('.np').forEach(el=>{el.textContent=previewName(draft.team,draft[el.dataset.key]);});}
+
+/* ---------- report + text ---------- */
+function buildText(){
+  const c=calc(),I=S.info,L=[];
+  L.push(subject(),'','大会: '+I.tournament,'対戦日: '+fmtDate(I.date)+(I.ko?' キックオフ '+I.ko:''),'競技場: '+I.venue+(String(I.crowd)?'  観客数: '+I.crowd+'人':''),
+   '天候: '+(I.weather||'-')+' / グラウンド: '+(I.ground||'-')+' / 風: '+(I.wind||'-'),
+   'レフリー: '+S.off.ref.name,'記録係: '+S.scorer.team+' '+S.scorer.name,'',
+   tn('h')+' '+c.tot.h+' - '+c.tot.a+' '+tn('a')+'  (前半 '+c.pts.h[1]+'-'+c.pts.a[1]+' / 後半 '+c.pts.h[2]+'-'+c.pts.a[2]+')');
+  ['h','a'].forEach(t=>L.push(tn(t)+': T'+(c.cnt[t][1].T||0)+'+'+(c.cnt[t][2].T||0)+' G'+(c.cnt[t][1].G||0)+'+'+(c.cnt[t][2].G||0)+' PT'+((c.cnt[t][1].PT||0)+(c.cnt[t][2].PT||0))+' PG'+((c.cnt[t][1].PG||0)+(c.cnt[t][2].PG||0))+' DG'+((c.cnt[t][1].DG||0)+(c.cnt[t][2].DG||0))+'  反則 PK'+(S.fouls[t][1].pk+S.fouls[t][2].pk)+' FK'+(S.fouls[t][1].fk+S.fouls[t][2].fk)+(S.pts[t]!==''?'  勝ち点 '+S.pts[t]:'')));
+  L.push('','■得点経過');
+  sortedEvents().forEach(e=>{const r=c.run[e.id];L.push(halfL(e.half)+e.min+'分 '+tn(e.team)+' '+(e.no?e.no+'/'+sn(e.team,e.no)+' ':'')+TY[e.type].c+'  '+r[0]+'-'+r[1]);});
+  if(S.changes.length){L.push('','■交替・入替・一時的退場');[...S.changes].sort(byTime).forEach(x=>{L.push(halfL(x.half)+x.min+'分 '+tn(x.team)+' '+{sub:'交替',swap:'入替',temp:'一時的退場'}[x.kind]+' '+x.out+'→'+(x.in||'-')+(x.conc?' 脳振盪×':'')+(x.kind==='temp'?' '+(x.reason==='その他'?x.rtext:x.reason)+(x.rmin!==''&&x.rmin!=null?' 復帰'+halfL(x.rhalf)+x.rmin+'分':''):''));});}
+  if(S.cards.length){L.push('','■カード');[...S.cards].sort(byTime).forEach(x=>{L.push(halfL(x.half)+x.min+'分 '+tn(x.team)+' '+(x.color==='y'?'イエロー':'レッド')+' '+x.no+(sn(x.team,x.no)?'/'+sn(x.team,x.no):'')+' '+(x.text||''));});}
+  ['h','a'].forEach(t=>{L.push('','■'+tn(t)+' メンバー');S.roster[t].forEach((p,i)=>{if(p.name)L.push((i+1)+' '+p.name+(p.grade?'('+p.grade+')':'')+(p.cap?' 主将':'')+(p.fr?' FR':''));});});
+  if(I.notes)L.push('','■特記事項',I.notes);
+  return L.join('\n');}
+
+/* ---------- 記録用紙(PDF様式の再現) ---------- */
+const PW=1414;
+const TYC={T:'T',G:'G',GX:'G×',PT:'PT',PG:'PG',PGX:'PG×',DG:'DG',DGX:'DG×'};
+const SHEET_CSS=`.paper{position:relative;width:1414px;background:#fff;color:#111;font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo","Noto Sans CJK JP","Noto Sans JP",sans-serif;font-size:12.5px;line-height:1.15;text-align:left;overflow:hidden}
+.paper *{box-sizing:border-box}
+.paper .ab{position:absolute;white-space:nowrap}
+.paper table{border-collapse:collapse;table-layout:fixed}
+.paper td{border:1px solid #111;padding:0 2px;text-align:center;vertical-align:middle;overflow:hidden;white-space:nowrap;font-weight:400;font-size:12.5px;line-height:1.1}
+.paper td.l{text-align:left;padding-left:8px}
+.paper td.p0{padding:0}
+.paper td.s{font-size:10px}
+.paper td.k{font-size:11px}
+.paper .v{color:#0b2d7a}
+.paper .g{color:#8d8d8d}
+.paper .rd{font-size:12px;margin-right:1px}
+.paper .fl3{display:flex;align-items:center;justify-content:space-around;height:100%}
+.paper .fl3 b{display:inline-block;min-width:26px;text-align:center;font-weight:400}
+.paper .wx1{height:14px;border-bottom:1px solid #111;display:flex;justify-content:space-around;align-items:center}
+.paper .wx2{height:15px;display:flex;justify-content:center;gap:28px;align-items:center}
+.paper .gr{display:flex;flex-direction:column;justify-content:center;gap:3px;padding-left:14px;text-align:left;font-size:12px}
+.paper .gr div{display:flex;gap:10px}
+.paper .rf{height:62px;display:flex;flex-direction:column;justify-content:space-between;padding:0 10px}
+.paper .rft{flex:1;display:flex;align-items:center}
+.paper .rft .nm,.paper .arw .nm,.paper .mcw .nm{flex:1;text-align:center;font-size:14px}
+.paper .rfa{text-align:right;height:22px;font-size:12px}
+.paper .sgw{position:relative;height:100%;min-height:26px;text-align:left;padding:3px 6px;font-size:12px}
+.paper .sgw img{position:absolute;right:6px;bottom:2px;max-height:48px;max-width:110px}
+.paper .arw{display:flex;align-items:center;height:100%;padding-left:18px}
+.paper .arw .ar{width:30px;text-align:left}
+.paper .mcw{display:flex;align-items:center;padding-left:16px}
+.paper .af{display:flex;align-items:center;justify-content:center;gap:1px;font-size:9px}
+.paper .af .u{min-width:36px;text-align:center;font-size:11px}
+.paper .cr{border:1px solid #0b2d7a;border-radius:9px;padding:1px 3px}
+.paper .cap{display:inline-block;width:21px;height:21px;line-height:19px;border:1.5px solid #0b2d7a;border-radius:50%;text-align:center}
+.paper .pn{font-size:14px}
+.paper .tmc{display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 20px;height:100%}
+.paper .tmc .hf{position:relative}
+.paper .tmc .hf i{position:absolute;right:100%;font-style:normal;margin-right:2px}
+.paper .tmc .mn{min-width:20px;text-align:center}
+.paper .tt2{display:flex;align-items:center;height:100%}
+.paper .tt2 .tmc{flex:1;padding:0 4px 0 18px}
+.paper .nn{display:flex;align-items:center;justify-content:space-between;padding:0 5px;height:100%;font-size:11.5px}
+.paper .nn .n1{min-width:22px;text-align:center}
+.paper .lz{display:flex;align-items:center;height:100%}
+.paper .lz .v{flex:1}
+.paper .lz span:last-child{padding-right:10px}
+.paper .ph2{display:flex;align-items:flex-end;gap:16px;height:100%;padding-left:4px}
+.paper .u2{display:inline-block;min-width:130px;text-align:center}
+.paper .ntb{white-space:pre-wrap;font-size:12.5px;line-height:1.35;margin-top:6px;display:block}
+.paper .tn0{font-size:12px}.paper .tn1{font-size:10px}.paper .tn2{font-size:8.5px}
+.paper .ad div{height:20.4px}
+`;
+function sheet(){
+  const I=S.info,c=calc(),has=S.events.length>0;
+  const fa=[1,2].some(h=>['h','a'].some(t=>S.fouls[t][h].pk||S.fouls[t][h].fk));
+  const E=x=>esc(x==null?'':x);
+  const V=x=>{const t=E(x);return t===''?'':'<span class="v">'+t+'</span>';};
+  const rd=(on,l)=>'<span class="rd">'+(on?'●':'○')+'</span>'+l;
+  const ab=(l,t,w,inner,st)=>'<div class="ab" style="left:'+l+'px;top:'+t+'px;'+(w?'width:'+w+'px;':'')+(st||'')+'">'+inner+'</div>';
+  const cg=a=>'<colgroup>'+a.map(x=>'<col style="width:'+x+'px"/>').join('')+'</colgroup>';
+  const tbl=(l,t,a,rows)=>'<table class="ab" style="left:'+l+'px;top:'+t+'px;width:'+a.reduce((p,q)=>p+q,0)+'px">'+cg(a)+'<tbody>'+rows+'</tbody></table>';
+  const tr=(h,cells)=>'<tr style="height:'+h+'px">'+cells+'</tr>';
+  const td=(x,o)=>{o=o||{};return '<td'+(o.cs?' colspan="'+o.cs+'"':'')+(o.rs?' rowspan="'+o.rs+'"':'')+(o.c?' class="'+o.c+'"':'')+(o.st?' style="'+o.st+'"':'')+'>'+x+'</td>';};
+  const tmc=(h,m)=>'<div class="tmc"><span class="hf">'+(h?'<i class="v">'+(Number(h)===1?'前':'後')+'</i>':'')+'半</span><span class="mn">'+(m===''||m==null?'':V(m))+'</span><span>分</span></div>';
+  const dm=/^(\d{4})-(\d{2})-(\d{2})$/.exec(I.date||'');let dy='',dmo='',dd='',dw='';
+  if(dm){dy=dm[1];dmo=String(+dm[2]);dd=String(+dm[3]);dw='日月火水木金土'[new Date(+dm[1],+dm[2]-1,+dm[3]).getDay()];}
+  const ko=/^(\d{1,2}):(\d{2})$/.exec(I.ko||'');const kh=ko?String(+ko[1]):'',km=ko?ko[2]:'';
+  let h='';
+  /* title */
+  h+=ab(0,90,1294,'２０２６試合試合記録','text-align:center;font-size:20px;letter-spacing:1px');
+  h+=ab(163,112,null,'大会名：','font-size:17px;font-weight:700');
+  h+=ab(250,110,282,V(I.tournament),'height:23px;border-bottom:1px solid #111;font-size:15px;padding-left:4px;overflow:hidden');
+  h+=ab(1120,115,null,'2020/2/1(改訂)','font-size:13px');
+  /* box A */
+  const wind=I.wind,wk=['晴れ','曇り','雨','雪'].map(k=>'<span>'+rd(I.weather===k,k)+'</span>').join('');
+  const wx='<div class="wx1">'+wk+'</div><div class="wx2"><span>'+rd(wind==='無風','無風')+'</span><span>'+rd(wind==='弱風','弱風')+'</span></div><div class="wx2"><span>'+rd(wind==='微風','微風')+'</span><span>'+rd(wind==='強風','強風')+'</span></div>';
+  const gd=I.ground,gr='<div class="gr"><div><span>'+rd(gd==='良い','良い')+'</span><span>'+rd(gd==='やや良い','やや良い')+'</span></div><div><span>'+rd(gd==='やや悪い','やや悪い')+'</span><span>'+rd(gd==='悪い','悪い')+'</span></div></div>';
+  h+=tbl(158,153,[70,269,51,147],
+    tr(43,td('対戦日')+td('<div class="fl3"><span><b class="v">'+E(dy)+'</b>年</span><span><b class="v">'+E(dmo)+'</b>月</span><span><b class="v">'+E(dd)+'</b>日（<b class="v">'+E(dw)+'</b>）</span></div>',{c:'p0'})+td('Kick off',{c:'k'})+td('<div class="fl3"><span><b class="v">'+E(kh)+'</b>時</span><span><b class="v">'+E(km)+'</b>分</span></div>',{c:'p0'}))+
+    tr(38,td('競技場')+td(V(I.venue))+td('観客数',{c:'k'})+td('<div class="lz"><span class="v">'+E(I.crowd)+'</span><span>人</span></div>',{c:'p0'}))+
+    tr(44,td('天候')+td(wx,{c:'p0'})+td('ｸﾞﾗﾝﾄﾞ<br/>状態',{c:'s'})+td(gr,{c:'p0'}))+
+    tr(29,td('ドクター')+td(V(S.off.dr.name),{cs:3}))+
+    tr(38,td('記録係')+td('<div class="fl3" style="justify-content:flex-start;gap:0"><span style="width:210px;text-align:left;padding-left:10px">チーム名：'+V(S.scorer.team)+'</span><span>氏名：'+V(S.scorer.name)+'</span></div>',{cs:3,c:'p0'})));
+  /* box B */
+  const sign=k=>'<div class="sgw">sign'+(S.sig[k]?'<img src="'+S.sig[k]+'" alt=""/>':'')+'</div>';
+  const aff=o=>{const asc=o.kind==='協会公認',un=o.kind==='大学'||(o.kind===''&&!!o.aff);return '<div class="af"><span class="v u">'+(asc?E(o.aff):'')+'</span><span class="'+(asc?'cr':'')+'">協会公認</span>／<span class="v u">'+(un?E(o.aff):'')+'</span><span class="'+(un?'cr':'')+'">大学</span></div>';};
+  const arRow=(hh,k,first)=>tr(hh,(first?td('アシスタントレフリー',{rs:3,c:'k'}):'')+td('<div class="arw"><span class="ar">AR</span><span class="nm v">'+E(S.off[k].name)+'</span></div>',{c:'p0'})+td(aff(S.off[k]),{c:'p0'}));
+  h+=tbl(711,153,[149,237,152],
+    tr(64,td('<div class="rf"><div class="rft"><span>レフリー</span><span class="nm v">'+E(S.off.ref.name)+'</span></div><div class="rfa">（ <span class="v">'+E(I.assoc)+'</span> 協会公認）</div></div>',{cs:2,c:'p0'})+td(sign('ref'),{c:'p0'}))+
+    arRow(30,'ar1',true)+arRow(30,'ar2',false)+arRow(31,'ar3',false)+
+    tr(37,td('<div class="mcw"><span>マッチコミッショナー</span><span class="nm v">'+E(S.off.mc.name)+'</span></div>',{cs:2,c:'p0'})+td(sign('mc'),{c:'p0'})));
+  /* teams */
+  const grp={0:['FW',8],8:['HB',2],10:['TB',4],14:['FB',1],15:['Re',8]};
+  const team=(t,left,cols)=>{
+    let r=tr(45,td('チーム名：'+V(S.teams[t].name),{cs:5,c:'l',st:'font-size:13px'}))+tr(25,td('')+td('フロントロー',{c:'s'})+td('氏　名')+td('（学年）',{c:'k'})+td('Pos.'));
+    S.roster[t].forEach((p,i)=>{const nm=E(p.name);r+=tr(24.87,td(p.cap?'<span class="cap">'+(i+1)+'</span>':String(i+1),{c:'p0',st:'font-size:13px'})+td(p.fr?'<span class="v">○</span>':'')+td(nm?'<span class="v'+(nm.length>9?'" style="font-size:11px':'')+'">'+nm+'</span>':'',{c:'pn'})+td(V(p.grade))+(grp[i]?td(grp[i][0],{rs:grp[i][1],c:'k'}):''));});
+    return tbl(left,365,cols,r);};
+  h+=team('h',158,[47,60,192,56,35])+team('a',875,[47,60,171,57,39]);
+  /* center: score */
+  const cn=(t,hf,k)=>has?String(c.cnt[t][hf][k]||0):'';
+  const sc=[63,63,33,69,61];
+  let sr=tr(23,td('得　点',{cs:5}))+tr(22,td('Home',{cs:2})+td('')+td('Away',{cs:2}))+tr(25,td('前半')+td('後半')+td('')+td('前半')+td('後半'));
+  ['T','G','PT','PG','DG'].forEach(k=>{sr+=tr(25,td(V(cn('h',1,k)))+td(V(cn('h',2,k)))+td(k)+td(V(cn('a',1,k)))+td(V(cn('a',2,k))));});
+  sr+=tr(50,td(V(has?c.pts.h[1]:''))+td(V(has?c.pts.h[2]:''))+td('計')+td(V(has?c.pts.a[1]:''))+td(V(has?c.pts.a[2]:'')));
+  sr+=tr(49,td('<span class="v" style="font-size:16px">'+(has?c.tot.h:'')+'</span>',{cs:2})+td('合計')+td('<span class="v" style="font-size:16px">'+(has?c.tot.a:'')+'</span>',{cs:2}));
+  h+=tbl(569,365,sc,sr);
+  h+=tbl(569,684,[126,33,130],tr(49,td('<span class="v" style="font-size:16px">'+E(S.pts.h)+'</span>')+td('勝ち点',{c:'s'})+td('<span class="v" style="font-size:16px">'+E(S.pts.a)+'</span>')));
+  h+=tbl(569,758,[142,147],tr(25,td('ロスタイム')+td('<div class="lz"><span class="v">'+E(I.loss)+'</span><span>分</span></div>',{c:'p0'})));
+  const fv=(t,hf,k)=>(has||fa)?String(S.fouls[t][hf][k]):'',ft=(t,k)=>(has||fa)?String(S.fouls[t][1][k]+S.fouls[t][2][k]):'';
+  h+=tbl(569,808,sc,tr(25,td('反　則',{cs:5}))+tr(25,td('PK')+td('FK')+td('')+td('PK')+td('FK'))+
+    tr(50,td(V(fv('h',1,'pk')))+td(V(fv('h',1,'fk')))+td('前半')+td(V(fv('a',1,'pk')))+td(V(fv('a',1,'fk'))))+
+    tr(50,td(V(fv('h',2,'pk')))+td(V(fv('h',2,'fk')))+td('後半')+td(V(fv('a',2,'pk')))+td(V(fv('a',2,'fk'))))+
+    tr(50,td(V(ft('h','pk')))+td(V(ft('h','fk')))+td('合計')+td(V(ft('a','pk')))+td(V(ft('a','fk')))));
+  const cap='◆ゲームキャプテンは背番号に、フロントロー適合選手はその列に〇を付けてください';
+  h+=ab(162,1010,null,cap,'font-size:11px')+ab(879,1010,null,cap,'font-size:11px');
+  /* changes */
+  const subs=t=>S.changes.filter(x=>x.team===t&&x.kind!=='temp').sort(byTime),tmps=t=>S.changes.filter(x=>x.team===t&&x.kind==='temp').sort(byTime);
+  const NS=Math.max(11,subs('h').length,subs('a').length),NT=Math.max(6,tmps('h').length,tmps('a').length),RH=20.4,y0=1053;
+  h+=ab(190,1036,null,'交替・・・負傷 入替・・・戦術 脳振盪またはその疑いがある場合には（ ）に×を記すこと','font-size:12px');
+  h+=ab(772,1036,null,'交代・・・負傷 入替・・・戦術 脳振盪またはその疑いがある場合には（ ）に×を記すこと','font-size:12px');
+  const reasonT=x=>x.reason==='その他'?x.rtext:(x.reason==='フロントローシービン'?'ﾌﾛﾝﾄﾛｰｼﾝﾋﾞﾝ':x.reason);
+  const subRow=x=>tr(RH,td('<span class="rd">'+(x&&x.kind==='sub'?'●':'○')+'</span>交替 <span class="rd">'+(x&&x.kind==='swap'?'●':'○')+'</span>入替',{c:'k'})+td(tmc(x?x.half:'',x?x.min:''),{c:'p0'})+td('<div class="nn"><span class="n1">'+(x?V(x.out):'')+'</span><span>→</span><span class="n1">'+(x?V(x.in):'')+'</span><span>( '+(x&&x.conc?'<span class="v">×</span>':'&#160;')+' )</span></div>',{c:'p0'}));
+  const tmpRow=x=>{const ret=x&&x.rmin!==''&&x.rmin!=null;return tr(RH,td('<div class="tt2">'+tmc(x?x.half:'',x?x.min:'')+'<span>→</span>'+tmc(ret?x.rhalf:'',ret?x.rmin:'')+'</div>',{c:'p0'})+td('<div class="nn"><span class="n1">'+(x?V(x.out):'')+'</span><span>→</span><span class="n1">'+(x?V(x.in):'')+'</span></div>',{c:'p0'})+td(x?'<span class="v">'+E(reasonT(x))+'</span>':'',{c:'s'}));};
+  const cfg={h:{n:'Home',sl:158,sc:[90,85,89],tl:422,tc:[163,70,74],nl:442},a:{n:'Away',sl:751,sc:[87,85,82],tl:1005,tc:[155,72,69],nl:1025}};
+  ['h','a'].forEach(t=>{const g=cfg[t],sb=subs(t),tp=tmps(t);
+    let r=tr(18,td(g.n+' 交替/入替',{cs:3}))+tr(20,td('種　類')+td('時　間')+td('背番号'));
+    for(let i=0;i<NS;i++)r+=subRow(sb[i]);
+    h+=tbl(g.sl,y0,g.sc,r);
+    r=tr(18,td(g.n+' 一時的退場',{cs:3}))+tr(20,td('時　間')+td('背番号')+td('内　容'));
+    for(let i=0;i<NT;i++)r+=tmpRow(tp[i]);
+    h+=tbl(g.tl,y0,g.tc,r);
+    h+=ab(g.nl,y0+38+NT*RH+25,null,'内容：出血・ﾌﾛﾝﾄﾛｰｼﾝﾋﾞﾝ・その他の理由','font-size:12px');});
+  const blockEnd=y0+38+NS*RH;
+  /* cards */
+  const cds=t=>S.cards.filter(x=>x.team===t).sort(byTime);
+  const K=Math.max(4,cds('h').length,cds('a').length),cTitle=blockEnd+12,cTop=cTitle+18;
+  const cardCfg={h:{n:'Home',l:158,c:[92,83,89,290],tl:162},a:{n:'Away',l:751,c:[87,85,82,279],tl:755}};
+  ['h','a'].forEach(t=>{const g=cardCfg[t],cd=cds(t);
+    h+=ab(g.tl,cTitle,null,g.n+' カード/処分','font-size:13px');
+    let r=tr(20,td('種　類')+td('時　間')+td('背番号')+td('内　容'));
+    for(let i=0;i<K;i++){const x=cd[i];r+=tr(RH,td('<span class="rd">'+(x&&x.color==='y'?'●':'○')+'</span>ｲｴﾛｰ <span class="rd">'+(x&&x.color==='r'?'●':'○')+'</span>レッド',{c:'k'})+td(tmc(x?x.half:'',x?x.min:''),{c:'p0'})+td(x?V(x.no):'')+td(x?V(x.text):'',{c:'l'}));}
+    h+=tbl(g.l,cTop,g.c,r);});
+  const cEnd=cTop+20+K*RH;
+  /* score progress */
+  const evs=sortedEvents(),R=Math.max(15,Math.ceil(evs.length/2)),pHead=cEnd+31,pTop=pHead+19,PRH=21.67;
+  const k1=I.kick1,k2=k1==='h'?'a':k1==='a'?'h':'';
+  h+=ab(162,pHead,843,'<div class="ph2"><span style="font-size:14px">得点経過</span><span>前半Kick off チーム名：<span class="v u2">'+E(k1?S.teams[k1].name:'')+'</span></span><span>/後半Kick off チーム名：<span class="v u2">'+E(k2?S.teams[k2].name:'')+'</span></span></div>','height:20px;border-bottom:1px solid #111;font-size:13px');
+  const pcols={l:[90,114,80,36,40,12,40],r:[90,121,80,36,40,12,40]};
+  const tnc=n=>n.length<=4?'tn0':n.length<=7?'tn1':'tn2';
+  const prow=e=>{let nm='',no='';if(e){no=e.no?V(e.no):'';const nn=e.no?sn(e.team,e.no):'';nm=e.no?no+'<span class="g"> /</span>'+(nn?'<span class="v'+(nn.length>3?' tn1':'')+'">'+E(nn)+'</span>':''):'<span class="g">/</span>';}else nm='<span class="g">/</span>';
+    const r=e?c.run[e.id]:null,tname=e?E(S.teams[e.team].name):'';
+    return tr(PRH,td(tmc(e?e.half:'',e?e.min:''),{c:'p0'})+td(e?'<span class="v '+tnc(tname)+'">'+tname+'</span>':'')+td(nm,{c:'k'})+td(e?V(TYC[e.type]):'',{c:'k'})+td(r?V(r[0]):'')+td('<span class="g">-</span>',{c:'p0'})+td(r?V(r[1]):''));};
+  ['l','r'].forEach((side,si)=>{let r=tr(21,td('時　間')+td('チーム名')+td('背番号・名前',{c:'s'})+td('種類',{c:'k'})+td('H')+td('')+td('Ａ'));
+    for(let i=0;i<R;i++)r+=prow(evs[si*R+i]);
+    h+=tbl(si?586:158,pTop,pcols[side],r);});
+  const pEnd=pTop+21+R*PRH;
+  h+=ab(1022,pTop,262,'特記事項<span class="ntb v">'+E(I.notes)+'</span>','height:122px;border:1px solid #111;padding:4px 6px;font-size:13px;white-space:normal;overflow:hidden');
+  const ad=[['試合記録は下記に送付ください。',0],['●郵送の場合',0],['980-8511 仙台市青葉区土樋1-3-1',10],['東北学院大学　山田　純',94],['●メールの場合',0],['rugby.gakusei.tohoku@gmail.com',10],['●mailで送付する際は、タイトル（件名）は',0],['【チーム名】試合日 試合記録・・・と記載ください。',0],['例）【●●大学】260906試合記録',0]];
+  h+=ab(1026,pTop+147,null,'<div class="ad">'+ad.map(a=>'<div style="padding-left:'+a[1]+'px">'+a[0]+'</div>').join('')+'</div>','font-size:12.5px');
+  const fTop=pEnd+20;
+  h+=ab(162,fTop,null,'種類：「Ｔ＝ﾄﾗｲ」・「Ｇ＝ｺﾝﾊﾞｰｼﾞｮﾝｺﾞｰﾙ成功」・「Ｇ×＝ｺﾝﾊﾞｰｼﾞｮﾝｺﾞｰﾙ失敗」・「ＰＴ＝ﾍﾟﾅﾙﾃｨｰﾄﾗｲ」・「ＰＧ＝ﾍﾟﾅﾙﾃｨ-ｺﾞｰﾙ成功」','font-size:12px');
+  h+=ab(162,fTop+15,null,'　　「ＰＧ×＝ﾍﾟﾅﾙﾃｨｰｺﾞｰﾙ失敗」・「DG＝ﾄﾞﾛｯﾌﾟｺﾞｰﾙ成功」・「DG×＝ﾄﾞﾛｯﾌｺﾞｰﾙ失敗」 <b style="text-decoration:underline">★得点経過の名前は苗字だけ記載</b>','font-size:12px');
+  const H=Math.max(2000,Math.round(fTop+15+14+107));
+  return {html:'<div class="paper" style="height:'+H+'px">'+h+'</div>',height:H};
+}
+function buildReport(){const sh=sheet();
+  return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(subject())+'</title><style>@page{size:A3 portrait;margin:0}html,body{margin:0;background:#e6e6e6}body{padding:12px}#wx{width:1414px;transform-origin:0 0}'+SHEET_CSS+'@media print{html,body{background:#fff}body{padding:0;height:auto!important}#wx{transform:none!important}.paper{zoom:0.794}}</style></head><body><div id="wx">'+sh.html+'</div><script>(function(){var w=document.getElementById("wx");function f(){var s=Math.min(1,(innerWidth-24)/1414);w.style.transform="scale("+s+")";document.body.style.height=(w.offsetHeight*s+24)+"px"}f();addEventListener("resize",f)})()<\/script></body></html>';}
+function mountPreview(){const box=$('#pvbox');if(!box)return;const sc=(box.clientWidth||300)/PW,sh=sheet();box.style.height=Math.round(sh.height*sc)+'px';box.innerHTML='<div class="pvpaper" style="transform:scale('+sc+')">'+sh.html+'</div>';}
+let pvSc=.5;
+function pvRender(keep){const sh=sheet(),st=$('#pvst'),inn=$('#pvin');let cx=.5,cy=0;
+  if(keep&&inn.offsetWidth){cx=(st.scrollLeft+st.clientWidth/2)/inn.offsetWidth;cy=(st.scrollTop+st.clientHeight/2)/inn.offsetHeight;}
+  inn.style.width=Math.round(PW*pvSc)+'px';inn.style.height=Math.round(sh.height*pvSc)+'px';
+  inn.innerHTML='<div class="pvpaper" style="transform:scale('+pvSc+')">'+sh.html+'</div>';
+  $('#pvz').textContent=Math.round(pvSc*100)+'%';
+  if(keep){st.scrollLeft=cx*inn.offsetWidth-st.clientWidth/2;st.scrollTop=cy*inn.offsetHeight-st.clientHeight/2;}}
+function pdfBlob(jpeg,iw,ih){const enc=new TextEncoder(),W=841.89,Hh=1190.55;let w=W,h=W*ih/iw;if(h>Hh){h=Hh;w=Hh*iw/ih;}
+  const chunks=[],offs=[];let len=0;const push=u=>{chunks.push(u);len+=u.length;},str=t=>push(enc.encode(t));
+  str('%PDF-1.4\n');
+  offs[1]=len;str('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
+  offs[2]=len;str('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n');
+  offs[3]=len;str('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+W+' '+Hh+'] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n');
+  offs[4]=len;str('4 0 obj\n<< /Type /XObject /Subtype /Image /Width '+iw+' /Height '+ih+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpeg.length+' >>\nstream\n');push(jpeg);str('\nendstream\nendobj\n');
+  const cs='q '+w.toFixed(2)+' 0 0 '+h.toFixed(2)+' '+((W-w)/2).toFixed(2)+' '+(Hh-h).toFixed(2)+' cm /Im0 Do Q';
+  offs[5]=len;str('5 0 obj\n<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream\nendobj\n');
+  const xr=len;let xs='xref\n0 6\n0000000000 65535 f \n';for(let i=1;i<=5;i++)xs+=String(offs[i]).padStart(10,'0')+' 00000 n \n';
+  str(xs+'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF');
+  return new Blob(chunks,{type:'application/pdf'});}
+function rasterize(sh,scale){return new Promise((res,rej)=>{
+  const tmp=document.createElement('div');tmp.innerHTML=sh.html;
+  const xml=new XMLSerializer().serializeToString(tmp.firstElementChild);
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+PW+'" height="'+sh.height+'"><foreignObject x="0" y="0" width="'+PW+'" height="'+sh.height+'"><style xmlns="http://www.w3.org/1999/xhtml">'+SHEET_CSS+'</style>'+xml+'</foreignObject></svg>';
+  const img=new Image();
+  img.onload=()=>{try{const cv=document.createElement('canvas');cv.width=Math.round(PW*scale);cv.height=Math.round(sh.height*scale);const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,cv.width,cv.height);g.scale(scale,scale);g.drawImage(img,0,0,PW,sh.height);res(cv);}catch(e){rej(e);}};
+  img.onerror=()=>rej(new Error('render'));
+  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);});}
+
+/* ---------- actions ---------- */
+const A={};
+A.tab=d=>{tab=d.v;ls.set(KEYT,tab);render();window.scrollTo(0,0);};
+A.goto=d=>{tab=d.tab;if(d.t)mt=d.t;ls.set(KEYT,tab);render();window.scrollTo(0,0);};
+A.mt=d=>{mt=d.v;render();};
+A.close=()=>closeSheet();
+A.tact=d=>{const a=toastActs[d.i];$('#toast').hidden=true;if(a)a.fn();};
+A.set=(d,el)=>{const p=d.p,cur=getPath(S,p);setPath(S,p,cur===d.v?'':d.v);save();if(p==='info.kick1'){render();return;}$$('[data-a="set"][data-p="'+p+'"]').forEach(b=>b.setAttribute('aria-pressed',String(getPath(S,p)===b.dataset.v)));};
+A.cap=d=>{const r=S.roster[mt],i=Number(d.i),on=!r[i].cap;r.forEach(p=>p.cap=false);r[i].cap=on;save();$$('[data-a="cap"]').forEach(b=>b.setAttribute('aria-pressed',String(r[Number(b.dataset.i)].cap)));};
+A.fr=d=>{const p=S.roster[mt][Number(d.i)];p.fr=!p.fr;save();$$('[data-a="fr"]')[Number(d.i)].setAttribute('aria-pressed',String(p.fr));};
+A.clk=()=>{if(S.clock.start){pauseClock();wake(false);}else{S.clock.start=Date.now();wake(true);}save();renderHead();};
+A.half=d=>{const n=Number(d.v);if(S.clock.half===n)return;pauseClock();wake(false);S.clock.half=n;save();renderHead();if(tab==='rec')render();};
+A['clk-adj']=()=>{const s=Math.floor(halfMs(S.clock.half)/1000);draft={k:'clock',cm:Math.floor(s/60),cs:s%60};showSheet();};
+A['clk-set']=()=>{const ms=((Number(draft.cm)||0)*60+(Number(draft.cs)||0))*1000;S.clock.acc[S.clock.half]=ms;if(S.clock.start)S.clock.start=Date.now();save();closeSheet();renderHead();};
+A['clk-zero']=()=>{draft.cm=0;draft.cs=0;A['clk-set']();};
+A.foul=d=>{const f=S.fouls[d.t][S.clock.half];f[d.k]=Math.max(0,f[d.k]+Number(d.d));save();render();};
+
+function openScore(team,type,pre){draft=Object.assign({k:'score',id:null,team,base:baseOf(type),ok:!/X$/.test(type),half:S.clock.half,min:defMin(),no:''},pre||{});showSheet();}
+A.score=d=>openScore(d.t,d.y||'');
+A.help=()=>{draft={k:'help'};showSheet();};
+A.pv=()=>{$('#pv').hidden=false;pvSc=Math.min(1,Math.max(.3,(innerWidth-24)/PW*1.7));pvRender(false);$('#pvst').scrollTop=0;};
+A['pv-close']=()=>{$('#pv').hidden=true;};
+A['pv-z']=d=>{pvSc=Math.min(1.2,Math.max(.2,pvSc*(Number(d.d)>0?1.25:.8)));pvRender(true);};
+A['pv-fit']=()=>{pvSc=Math.max(.2,($('#pvst').clientWidth-24)/PW);pvRender(false);};
+A['save-pdf']=async()=>{if(!caps.dl)return;toast('PDFを作っています',null,30000);
+  try{const sh=sheet(),cv=await rasterize(sh,1.75),url=cv.toDataURL('image/jpeg',.92),bin=atob(url.split(',')[1]),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    const nm=(S.teams.h.name+'_'+S.teams.a.name).replace(/[\\\/:*?"<>|\s]/g,'');
+    $('#toast').hidden=true;
+    await caps.dl.save({filename:'試合記録_'+(S.info.date||'').replace(/-/g,'')+(nm!=='_'?'_'+nm:'')+'.pdf',data:pdfBlob(u8,cv.width,cv.height)});toast('保存しました');}
+  catch(e){$('#toast').hidden=true;if(!e||e.code!=='declined')toast('PDFを作れませんでした。「HTMLで保存」を使ってください',null,5000);}};
+A['ev-edit']=d=>{const e=S.events.find(x=>String(x.id)===d.id);if(!e)return;draft={k:'score',id:e.id,team:e.team,base:baseOf(e.type),ok:!/X$/.test(e.type),half:e.half,min:e.min,no:e.no==null?'':e.no};showSheet();};
+A['d-set']=d=>{draft[d.k]=d.n!==undefined?Number(d.v):d.v;if(d.k==='base'&&d.v==='PT')draft.no='';if(d.k==='kind'&&d.v==='temp'&&draft.reason==='')draft.reason='出血';renderSheet();};
+A['d-ok']=d=>{draft.ok=d.v==='1';renderSheet();};
+A['d-no']=d=>{const n=Number(d.v);draft[d.k]=draft[d.k]===n?'':n;renderSheet();};
+A['d-step']=d=>{const k=d.k,v=Math.max(0,(Number(draft[k])||0)+Number(d.d));draft[k]=v;const el=$('#d-'+k);if(el)el.value=v;};
+A['d-text']=d=>{draft.text=d.v;const el=$('#d-text');if(el)el.value=d.v;};
+const mins=v=>v===''||v==null||isNaN(Number(v))?null:Number(v);
+A['sd-save']=()=>{const d=draft;
+  if(!d.base){toast('「何が入りましたか」を選んでください');return;}
+  if(mins(d.min)===null){toast('何分か入れてください');return;}
+  const type=(isKick(d.base)&&!d.ok)?d.base+'X':d.base;
+  const rec={team:d.team,type,half:Number(d.half),min:Number(d.min),no:(d.base==='PT'||d.no==='')?null:Number(d.no)};
+  if(d.id)Object.assign(S.events.find(e=>e.id===d.id),rec);else{rec.id=S.seq++;S.events.push(rec);}
+  save();closeSheet();renderHead();render();
+  if(!d.id&&type==='T'){toast(tn(d.team)+'のトライを記録しました。トライのあとのキックは?',[{l:'決まった',fn:()=>openScore(d.team,'G',{half:rec.half,min:rec.min})},{l:'外れた',fn:()=>openScore(d.team,'GX',{half:rec.half,min:rec.min})}],8000);}
+  else toast('記録しました');};
+A['chg-add']=d=>{draft={k:'chg',id:null,team:'h',kind:d.k,half:S.clock.half,min:defMin(),rhalf:S.clock.half,rmin:'',out:'',in:'',conc:false,reason:d.k==='temp'?'出血':'',rtext:''};showSheet();};
+A['chg-edit']=d=>{const x=S.changes.find(y=>String(y.id)===d.id);if(!x)return;draft=Object.assign({k:'chg'},x);showSheet();};
+A['ch-save']=()=>{const d=draft;if(mins(d.min)===null){toast('何分か入れてください');return;}
+  const ok=n=>Number.isInteger(Number(n))&&n!==''&&n>=1&&n<=23;
+  if(!ok(d.out)){toast('背番号を選んでください');return;}
+  if(d.kind!=='temp'&&!ok(d.in)){toast('入る選手を選んでください');return;}
+  const rec={team:d.team,kind:d.kind,half:Number(d.half),min:Number(d.min),rhalf:Number(d.rhalf),rmin:d.kind==='temp'?d.rmin:'',out:Number(d.out),in:d.in===''?'':Number(d.in),conc:d.kind==='temp'?false:!!d.conc,reason:d.kind==='temp'?d.reason:'',rtext:d.kind==='temp'&&d.reason==='その他'?d.rtext:''};
+  if(d.id)Object.assign(S.changes.find(x=>x.id===d.id),rec);else{rec.id=S.seq++;S.changes.push(rec);}
+  save();closeSheet();render();toast('記録しました');};
+A['card-add']=d=>{draft={k:'card',id:null,team:'h',color:d.c,half:S.clock.half,min:defMin(),no:'',text:''};showSheet();};
+A['card-edit']=d=>{const x=S.cards.find(y=>String(y.id)===d.id);if(!x)return;draft=Object.assign({k:'card'},x);showSheet();};
+A['cd-save']=()=>{const d=draft;if(mins(d.min)===null){toast('何分か入れてください');return;}
+  if(d.no===''||d.no<1||d.no>23){toast('背番号を選んでください');return;}
+  const rec={team:d.team,color:d.color,half:Number(d.half),min:Number(d.min),no:Number(d.no),text:d.text||''};
+  if(d.id)Object.assign(S.cards.find(x=>x.id===d.id),rec);else{rec.id=S.seq++;S.cards.push(rec);}
+  save();closeSheet();render();toast('記録しました');};
+function undoToast(msg){toast(msg,[{l:'元に戻す',fn:()=>{S[lastRm.arr].push(lastRm.r);save();renderHead();render();}}],6000);}
+A.del=()=>{if(!draft.cd){draft.cd=true;renderSheet();return;}
+  const arr={score:'events',chg:'changes',card:'cards'}[draft.k],i=S[arr].findIndex(x=>x.id===draft.id);
+  if(i>=0){lastRm={arr,r:S[arr].splice(i,1)[0]};}
+  save();closeSheet();renderHead();render();undoToast('削除しました');};
+A.undo=()=>{if(!S.events.length)return;const m=Math.max(...S.events.map(e=>e.id)),i=S.events.findIndex(e=>e.id===m);lastRm={arr:'events',r:S.events.splice(i,1)[0]};save();renderHead();render();undoToast('直前の記録を取り消しました');};
+A.autopts=()=>{const a=autoPts(calc());S.pts.h=a.h;S.pts.a=a.a;save();render();};
+A['sig-clear']=d=>{S.sig[d.k]='';save();render();};
+A.copy=d=>{if(d.w==='to')copy('rugby.gakusei.tohoku@gmail.com','宛先をコピーしました');else if(d.w==='subj')copy(subject(),'件名をコピーしました');else if(d.w==='body')copy(buildText(),'記録をコピーしました');else copy(JSON.stringify(S),'バックアップをコピーしました');};
+A['save-html']=async()=>{if(!caps.dl)return;const nm=(tn('h')+'_'+tn('a')).replace(/[\\\/:*?"<>|\s]/g,'');try{await caps.dl.save({filename:'試合記録_'+(S.info.date||'').replace(/-/g,'')+'_'+nm+'.html',data:buildReport()});toast('保存しました');}catch(e){if(!e||e.code!=='declined')toast('保存できませんでした');}};
+A['save-json']=async()=>{if(!caps.dl)return;try{await caps.dl.save({filename:'rugby-record-'+(S.info.date||'').replace(/-/g,'')+'.json',data:JSON.stringify(S)});toast('保存しました');}catch(e){if(!e||e.code!=='declined')toast('保存できませんでした');}};
+A.load=()=>$('#jf').click();
+A.paste=()=>{draft={k:'paste'};showSheet();};
+function importJSON(txt){try{const j=JSON.parse(txt);if(!j||j.v!==1||!j.info)throw 0;stash();S=merge(fresh(),j);save();renderHead();render();return true;}catch(e){return false;}}
+A['paste-load']=()=>{const ok=importJSON($('#pt').value);if(ok){closeSheet();toast('読み込みました');}else toast('読み込めませんでした。コピーした内容を確認してください');};
+$('#jf').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{toast(importJSON(String(r.result))?'読み込みました':'このファイルは読み込めません');};r.readAsText(f);e.target.value='';});
+A.new=()=>{if(!newArm){newArm=Date.now();render();const t=newArm;setTimeout(()=>{if(newArm===t){newArm=0;if(tab==='sum')render();}},5000);return;}
+  newArm=0;stash();const n=fresh();n.info.tournament=S.info.tournament;n.scorer=S.scorer;S=n;pauseClock();save();renderHead();tab='info';ls.set(KEYT,tab);render();window.scrollTo(0,0);toast('新しい試合を始めました');};
+A.prev=()=>{const p=ls.get(KEYP);if(!p)return;try{const cur=JSON.stringify(S);S=merge(fresh(),JSON.parse(p));ls.set(KEYP,cur);save();renderHead();render();toast('直前の試合に戻しました');}catch(e){toast('戻せませんでした');}};
+A.sample=()=>{
+  stash();const n=fresh(),fam1=['佐藤','鈴木','高橋','田中','伊藤','渡辺','山本','中村','小林','加藤','吉田','山田','佐々木','山口','松本','井上','木村','林','清水','斎藤','森','池田','橋本'],fam2=['阿部','石井','前田','藤田','後藤','岡田','長谷川','村上','近藤','石川','坂本','遠藤','青木','藤井','西村','福田','太田','三浦','岡本','松田','中島','原田','小川'],giv=['太郎','健太','翔','大輝','拓海','蓮','陸','悠斗','颯太','直樹','洋平','慎吾','裕太','和也','誠'];
+  n.teams={h:{name:'北稜大学(見本)'},a:{name:'杜の都大学(見本)'}};
+  n.roster.h=fam1.map((f,i)=>({name:f+' '+giv[i%giv.length],grade:String(i%4+1),cap:i===7,fr:i<3||i===15||i===16}));
+  n.roster.a=fam2.map((f,i)=>({name:f+' '+giv[(i+5)%giv.length],grade:String((i+1)%4+1),cap:i===1,fr:i<3||i===15||i===16}));
+  Object.assign(n.info,{venue:'見本競技場',crowd:'320',ko:'13:00',weather:'晴れ',ground:'良い',wind:'微風',kick1:'h',assoc:'東北'});
+  n.off.ref={name:'見本 レフリー',aff:'',kind:''};n.off.ar1={name:'見本 一郎',aff:'東北',kind:'協会公認'};n.off.ar2={name:'見本 二郎',aff:'見本',kind:'大学'};n.off.dr={name:'見本 医師',aff:'',kind:''};n.info.loss='3';n.info.notes='ウォーターブレイク 前半20分 / 後半20分';n.scorer={team:'北稜大学',name:'見本 記録係'};
+  const E=[['h','T',1,5,11],['h','G',1,5,10],['a','PG',1,18,10],['a','T',1,31,14],['a','GX',1,31,10],['h','PG',2,8,10],['h','T',2,22,2],['h','G',2,22,10],['a','PG',2,33,10]];
+  E.forEach(e=>n.events.push({id:n.seq++,team:e[0],type:e[1],half:e[2],min:e[3],no:e[4]}));
+  n.changes.push({id:n.seq++,team:'h',kind:'swap',half:2,min:20,rhalf:2,rmin:'',out:1,in:16,conc:false,reason:'',rtext:''});
+  n.cards.push({id:n.seq++,team:'a',color:'y',half:2,min:15,no:5,text:'反則の繰り返し'});
+  n.fouls.h[1]={pk:3,fk:1};n.fouls.h[2]={pk:2,fk:2};n.fouls.a[1]={pk:4,fk:0};n.fouls.a[2]={pk:3,fk:1};
+  S=n;{const ap=autoPts(calc());S.pts.h=ap.h;S.pts.a=ap.a;}pauseClock();save();renderHead();render();toast('見本の試合を読み込みました。「提出」の「新しい試合を始める」で消せます',null,4500);};
+
+/* ---------- メンバー表の読み取り ---------- */
+const POSW=/^(PR|HO|LO|FL|NO\.?8|SH|SO|WTB|CTB|FB|RE|FW|HB|TB|プロップ|フッカー|ロック|フランカー|ナンバーエイト|スクラムハーフ|スタンドオフ|ウイング|センター|フルバック|リザーブ|控え)$/i;
+function parseRoster(text){
+  const rows=[],skipped=[];let next=1;
+  String(text||'').normalize('NFKC').split(/\r?\n/).forEach(raw=>{
+    const line=raw.trim();if(!line)return;
+    if(/(氏名|選手名|背番号)/.test(line)&&!/\d/.test(line))return;
+    const cells=(line.includes('\t')?line.split('\t'):/[,、，]/.test(line)?line.split(/[,、，]/):line.split(/\s+/)).map(c=>c.trim()).filter(Boolean);
+    let no=null,grade='',fr=false,cap=false;const np=[];
+    cells.forEach((c,i)=>{let m;
+      if(/^[○〇◯]$/.test(c)){fr=true;return;}
+      if(/^(◎|主将|キャプテン|主|GC|C|\(C\)|CAP)$/i.test(c)){cap=true;return;}
+      if(POSW.test(c))return;
+      if(no===null&&i===0&&(m=/^(\d{1,2})番?$/.exec(c))){no=+m[1];return;}
+      if(np.length>0&&(m=/^([1-6])年?生?$/.exec(c))){grade=m[1];return;}
+      if(/^\d+$/.test(c)){if(no===null&&np.length===0)no=+c;return;}
+      np.push(c);});
+    let name=np.join(' ').replace(/[\(](主将|C|キャプテン|GC)[\)]/i,()=>{cap=true;return '';}).trim();
+    const gm=/[\(]([1-6])[\)]$/.exec(name);if(gm){grade=gm[1];name=name.replace(gm[0],'').trim();}
+    if(!name&&no===null)return;
+    if(no===null)no=next;
+    if(no<1||no>23){skipped.push(raw.trim());return;}
+    next=no+1;rows.push({no,name,grade,fr,cap});});
+  return{rows,skipped};}
+const ROSTER_PROMPT='添付の画像は、ラグビーの試合のメンバー表です(選手名簿、または記録用紙のメンバー欄)。背番号1〜23の選手を読み取り、JSONだけで返してください。\nチームが1つだけ写っていても、ホーム(左)とアウェイ(右)の2チームが写っていても、次の形式で、写っているチームの数だけ入れてください。\n{"teams":[{"side":"home か away か unknown","team":"チーム名(書かれていれば。なければ空文字)","players":[{"no":背番号(数字),"name":"苗字 名前","grade":"学年(数字だけ。なければ空文字)","fr":フロントロー適合の○が付いていればtrue,"cap":ゲームキャプテンの印(背番号を丸で囲むなど)があればtrue}]}]}\n記録用紙では、左の表がHome、右の表がAwayです。読めない文字は推測せず、その項目を空にしてください。画像にない選手を作らないでください。苗字と名前の間は半角スペース1つにしてください。画像が複数あるときは、すべてをまとめて読み取ってください。';
+let roCtl=null;
+function roErr(e){const c=e&&e.code;
+  if(c==='cancelled')return '';
+  if(c==='not_granted'||c==='sampling_disabled'||c==='images_unavailable'||c==='capability_disabled'||c==='capability_removed'||c==='not_declared')return 'この画面では、画像を読み取れません。表をコピーして貼り付けてください。';
+  if(c==='image_rejected')return 'この画像は読み込めません。JPEGかPNGの、別の画像を選んでください。';
+  if(c==='rate_limited')return '利用の上限に達しています。しばらくしてから、もう一度試してください。';
+  if(c==='session_expired')return 'ログインの有効期限が切れました。ページを開き直してください。';
+  if(c==='invalid_json'||c==='empty_completion'||c==='refused')return 'うまく読み取れませんでした。まっすぐ・明るく撮った画像で試すか、表を貼り付けてください。';
+  return '読み取れませんでした。もう一度試すか、表を貼り付けてください。';}
+function roGroupsFrom(res){
+  const ts=Array.isArray(res)?[{players:res}]:(res&&Array.isArray(res.teams)?res.teams:(res&&Array.isArray(res.players)?[res]:[]));
+  const skipped=[];
+  let gs=ts.map(t=>{const rows=[];(Array.isArray(t&&t.players)?t.players:[]).forEach(x=>{const no=Number(x&&x.no);
+      if(!Number.isInteger(no)||no<1||no>23){skipped.push(String(x&&x.no));return;}
+      rows.push({no,name:String((x&&x.name)||'').normalize('NFKC').trim(),grade:String((x&&x.grade)||'').normalize('NFKC').replace(/[^\d]/g,'').slice(0,2),fr:!!(x&&x.fr),cap:!!(x&&x.cap)});});
+    return{side:String((t&&t.side)||''),tname:String((t&&t.team)||'').trim(),rows};}).filter(g=>g.rows.length);
+  if(gs.length===1)gs[0].team=draft.team;
+  else if(gs.length>=2){gs=gs.slice(0,2);if(/away/i.test(gs[0].side)&&!/away/i.test(gs[1].side))gs.reverse();gs[0].team='h';gs[1].team='a';}
+  gs.forEach(g=>{g.useName=!!g.tname&&!S.teams[g.team].name;});
+  return{gs,skipped};}
+function sheetRoster(){const d=draft,gs=d.groups;
+  let h='<h2>メンバー表から読み取る</h2>';
+  if(d.busy)return h+'<div class="note"><p>画像を読み取っています。30秒ほどかかることがあります。</p></div><div class="actions"><span class="sp"></span><button class="btn" data-a="ro-stop">中止</button></div>';
+  if(!gs)h+='<div class="f"><span class="lb">どのチームに入れますか(1チーム分のとき)</span>'+teamSeg()+'</div>';
+  if(d.err)h+='<div class="warnbox">'+esc(d.err)+'</div>';
+  if(gs){
+    const n=gs.reduce((p,g)=>p+g.rows.length,0);
+    h+='<p class="hint">読み取り結果を確認してください。'+n+'人分が見つかりました。読み取れた背番号だけを入れ替えます。ほかの番号は、そのままです。'+(gs.length===1?'':'ホームとアウェイの両方を入れます。')+'</p>';
+    if(d.skipped&&d.skipped.length)h+='<div class="warnbox">背番号が1〜23でない行は、入れていません('+d.skipped.length+'行)。</div>';
+    gs.forEach((g,gi)=>{h+=(gs.length>1||gs[0].team!==mt?'<div class="ph"><h2>'+esc(tn(g.team))+' に入れる</h2></div>':'')+'<div class="rolist">'+g.rows.map(x=>'<div class="ror"><b>'+x.no+'</b><span class="ell">'+(x.name?esc(x.name):'<em class="warnt">氏名なし</em>')+'</span><span>'+(x.grade!==''?esc(x.grade)+'年':'')+'</span><span>'+(x.cap?'主将 ':'')+(x.fr?'FR':'')+'</span></div>').join('')+'</div>'+
+      (g.tname?'<label class="chk"><input type="checkbox" id="ro-un-'+gi+'" data-bind="d.groups.'+gi+'.useName"'+(g.useName?' checked':'')+'><span>チーム名を「'+esc(g.tname)+'」にする</span></label>':'');});
+    return h+'<div class="actions"><button class="btn" data-a="ro-again">やり直す</button><span class="sp"></span><button class="btn primary" data-a="ro-apply">この内容で入れる</button></div>';}
+  h+=stp(1,'写真・画像から読み取る')+'<button class="btn primary lg" data-a="ro-img">写真・画像を選ぶ</button>'+
+   '<p class="hint">メンバー表の写真やスクリーンショットを、Claudeが読み取ります。記録用紙のように、ホームとアウェイの2チームが写っていれば、両方を一度に読み取ります。スクリーンショットは、この画面に貼り付ける(Ctrl+V)か、ドラッグしても読み込めます。PDFは、画像にしてから選んでください。まっすぐ・明るく撮ると読み取りやすくなります。'+(caps.sm?'はじめて使うときに、許可の確認が出ます。':'この画面では使えないことがあります。使えないときは、下の方法を試してください。')+'</p>'+
+   stp(2,'表をコピーして貼り付ける')+'<textarea id="ro-text" data-bind="d.text" rows="6" placeholder="1  佐藤 太郎  4&#10;2  鈴木 健太  3&#10;3  高橋 翔  3">'+esc(d.text)+'</textarea>'+
+   '<p class="hint">ExcelやGoogleスプレッドシートで、背番号・氏名・学年の列を選んでコピーし、貼り付けます。列の順番が違っていても大丈夫です。背番号がないときは、上から1番、2番…と入れます。</p><div class="btnrow"><button class="btn lg" data-a="ro-parse">読み取る</button><button class="btn lg" data-a="ro-file">CSV・テキストを選ぶ</button></div>';
+  return h+'<div class="actions"><span class="sp"></span><button class="btn" data-a="close">やめる</button></div>';}
+function roFinish(d,gs,skipped){d.busy=false;d.groups=gs.length?gs:null;d.skipped=skipped||[];d.err=gs.length?'':'表の中に、選手が見つかりませんでした。';if(draft===d)renderSheet();}
+async function roImages(files){if(!files.length||!draft||draft.k!=='roster')return;
+  if(!caps.sm){toast('この画面では、画像の読み取りが使えません。表を貼り付けてください',null,5000);return;}
+  const d=draft;d.busy=true;d.err='';renderSheet();roCtl=new AbortController();
+  try{const max=(caps.img&&caps.img.maxCount)||1,use=files.slice(0,max);
+    const res=await caps.sm.json(ROSTER_PROMPT,{images:use.length===1?use[0]:use,signal:roCtl.signal});
+    const r=roGroupsFrom(res);if(draft!==d)return;roFinish(d,r.gs,r.skipped);}
+  catch(x){d.busy=false;d.err=roErr(x);if(draft===d)renderSheet();}
+  finally{roCtl=null;}}
+function roText(f){if(!f||!draft||draft.k!=='roster')return;const d=draft,fr=new FileReader();
+  fr.onload=()=>{if(draft!==d)return;const buf=fr.result;let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(x){try{txt=new TextDecoder('shift_jis').decode(buf);}catch(y){txt=new TextDecoder().decode(buf);}}
+    d.text=txt;const r=parseRoster(txt);roFinish(d,r.rows.length?[{team:d.team,tname:'',useName:false,rows:r.rows}]:[],r.skipped);};
+  fr.readAsArrayBuffer(f);}
+A['ro-open']=()=>{draft={k:'roster',team:mt,text:'',groups:null,skipped:[],busy:false,err:''};showSheet();};
+A['ro-parse']=()=>{if(!draft.text.trim()){toast('表を貼り付けてください');return;}const r=parseRoster(draft.text);roFinish(draft,r.rows.length?[{team:draft.team,tname:'',useName:false,rows:r.rows}]:[],r.skipped);};
+A['ro-again']=()=>{draft.groups=null;draft.err='';renderSheet();};
+A['ro-file']=()=>$('#rf').click();
+A['ro-img']=()=>{if(caps.sm&&!caps.img){toast('この画面では、画像を送れません。表を貼り付けてください',null,5000);return;}if(!caps.sm){toast('この画面では、画像の読み取りが使えません。表を貼り付けてください',null,5000);return;}$('#ri').click();};
+A['ro-stop']=()=>{if(roCtl)roCtl.abort();};
+A['ro-apply']=()=>{const d=draft;if(!d.groups||!d.groups.length)return;
+  const snap=JSON.stringify(S.roster),nm=[S.teams.h.name,S.teams.a.name];let n=0;
+  d.groups.forEach(g=>{const t=g.team;g.rows.forEach(x=>{const p=S.roster[t][x.no-1];if(x.name)p.name=x.name;if(x.grade!=='')p.grade=String(x.grade);if(x.fr)p.fr=true;if(x.cap){S.roster[t].forEach(q=>{q.cap=false;});p.cap=true;}});n+=g.rows.length;if(g.tname&&g.useName)S.teams[t].name=g.tname;});
+  mt=d.groups[0].team;save();closeSheet();renderHead();render();
+  toast(n+'人分を入れました',[{l:'元に戻す',fn:()=>{S.roster=JSON.parse(snap);S.teams.h.name=nm[0];S.teams.a.name=nm[1];save();renderHead();render();}}],8000);};
+$('#rf').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';roText(f);});
+$('#ri').addEventListener('change',e=>{const fs=Array.from(e.target.files||[]);e.target.value='';roImages(fs);});
+document.addEventListener('paste',e=>{if(!draft||draft.k!=='roster'||draft.busy||draft.groups)return;const fs=Array.from((e.clipboardData&&e.clipboardData.files)||[]).filter(f=>/^image\//.test(f.type));if(fs.length){e.preventDefault();roImages(fs);}});
+document.addEventListener('dragover',e=>{if(draft&&draft.k==='roster'&&!draft.busy&&!draft.groups)e.preventDefault();});
+document.addEventListener('drop',e=>{if(!draft||draft.k!=='roster'||draft.busy||draft.groups)return;e.preventDefault();const fs=Array.from((e.dataTransfer&&e.dataTransfer.files)||[]),im=fs.filter(f=>/^image\//.test(f.type));if(im.length)roImages(im);else if(fs[0])roText(fs[0]);});
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const f=A[el.dataset.a];if(f)f(el.dataset,el,e);});
+document.addEventListener('input',e=>{const t=e.target,b=t.dataset&&t.dataset.bind;if(!b)return;
+  let v=t.type==='checkbox'?t.checked:t.value;
+  if(t.dataset.num!==undefined)v=v===''?'':Number(v);
+  if(b.slice(0,2)==='d.'){setPath(draft,b.slice(2),v);updatePreviews();}
+  else{setPath(S,b,v);save();if(b.slice(0,6)==='teams.')renderHead();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('#pv').hidden)$('#pv').hidden=true;else if(!$('#ov').hidden)closeSheet();}});
+let rzT=null;window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(tab==='sum')mountPreview();},150);});
+
+/* ---------- boot ---------- */
+$('#nav').innerHTML=TABS.map(t=>'<button data-a="tab" data-v="'+t[0]+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+t[2]+'</svg><span>'+t[1]+'</span></button>').join('');
+{const st=document.createElement('style');st.id='sheetcss';st.textContent=SHEET_CSS;document.head.appendChild(st);}
+renderHead();render();
+if(S.clock.start)wake(true);
+(async()=>{try{if(window.claude&&window.claude.use){caps.dl=await window.claude.use('downloads');if(caps.dl&&tab==='sum'&&$('#ov').hidden){const y=window.scrollY;render();window.scrollTo(0,y);}}}catch(e){}
+  try{if(window.claude&&window.claude.use){caps.sm=await window.claude.use('sample');if(caps.sm){const l=await caps.sm.limits().catch(()=>null);if(l&&l.images){caps.img=l.images;$('#ri').accept=(l.images.mediaTypes||[]).join(',')||'image/*';$('#ri').multiple=(l.images.maxCount||1)>1;if(draft&&draft.k==='roster'&&!$('#ov').hidden)renderSheet();}}}}catch(e){}})();
+})();
+</script>
