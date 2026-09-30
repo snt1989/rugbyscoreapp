@@ -21,6 +21,7 @@ module.exports = async (req, res) => {
     await new Promise(r => setTimeout(r, 800));
     return res.status(401).json({ error: 'bad_pass' });
   }
+  if (body && body.check) return res.status(200).json({ ok: true });
   const imgs = body && Array.isArray(body.images) ? body.images.slice(0, 3) : [];
   if (!imgs.length) return res.status(400).json({ error: 'no_image' });
   const content = [];

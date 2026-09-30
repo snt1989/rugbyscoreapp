@@ -938,6 +938,8 @@ function roGroupsFrom(res){
   return{gs,skipped};}
 function sheetRoster(){const d=draft,gs=d.groups;
   let h='<h2>メンバー表から読み取る</h2>';
+  if(d.gate==='checking')return h+'<p class="hint">確認しています…</p><div class="actions"><span class="sp"></span><button class="btn" data-a="close">やめる</button></div>';
+  if(d.gate==='ask')return h+(d.err?'<div class="warnbox">'+esc(d.err)+'</div>':'')+'<div class="f"><label class="lb" for="ro-gpw">パスワード</label><input id="ro-gpw" type="password" autocomplete="current-password" data-bind="d.pw" value="'+esc(d.pw||'')+'"></div><p class="hint">この機能を使うには、パスワードが必要です。一度入力すると、この端末に保存されます。</p><div class="actions"><button class="btn" data-a="close">やめる</button><span class="sp"></span><button class="btn primary" data-a="ro-gate">開く</button></div>';
   if(d.busy)return h+'<div class="note"><p>画像を読み取っています。30秒ほどかかることがあります。</p></div><div class="actions"><span class="sp"></span><button class="btn" data-a="ro-stop">中止</button></div>';
   if(!gs)h+='<div class="f"><span class="lb">どのチームに入れますか(1チーム分のとき)</span>'+teamSeg()+'</div>';
   if(d.err)h+='<div class="warnbox">'+esc(d.err)+'</div>';
@@ -968,7 +970,13 @@ function roText(f){if(!f||!draft||draft.k!=='roster')return;const d=draft,fr=new
   fr.onload=()=>{if(draft!==d)return;const buf=fr.result;let txt;try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf);}catch(x){try{txt=new TextDecoder('shift_jis').decode(buf);}catch(y){txt=new TextDecoder().decode(buf);}}
     d.text=txt;const r=parseRoster(txt);roFinish(d,r.rows.length?[{team:d.team,tname:'',useName:false,rows:r.rows}]:[],r.skipped);};
   fr.readAsArrayBuffer(f);}
-A['ro-open']=()=>{draft={k:'roster',team:mt,text:'',groups:null,skipped:[],busy:false,err:''};showSheet();};
+async function roCheck(d){let st='open';
+  if(!(caps.sm&&caps.img)){try{const r=await fetch('/api/roster',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({check:true,pass:roPass()})});if(r.status===401)st='ask';}catch(x){}}
+  if(draft!==d)return;d.gate=st==='ask'?'ask':null;if(st==='ask'&&roPass()){roPass('');}renderSheet();}
+A['ro-open']=()=>{const d=draft={k:'roster',team:mt,text:'',groups:null,skipped:[],busy:false,err:'',gate:'checking',pw:''};showSheet();roCheck(d);};
+A['ro-gate']=()=>{const d=draft;if(!d.pw){toast('パスワードを入れてください');return;}const p=d.pw;d.pw='';d.gate='checking';d.err='';renderSheet();
+  fetch('/api/roster',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({check:true,pass:p})}).then(r=>{if(draft!==d)return;
+    if(r.status===401){d.gate='ask';d.err='パスワードが違います。';}else{roPass(p);d.gate=null;}renderSheet();}).catch(()=>{if(draft!==d)return;d.gate='ask';d.err='確認できませんでした。通信を確認して、もう一度試してください。';renderSheet();});};
 A['ro-parse']=()=>{if(!draft.text.trim()){toast('表を貼り付けてください');return;}const r=parseRoster(draft.text);roFinish(draft,r.rows.length?[{team:draft.team,tname:'',useName:false,rows:r.rows}]:[],r.skipped);};
 A['ro-again']=()=>{draft.groups=null;draft.err='';draft.needPass=false;renderSheet();};
 A['ro-pass']=()=>{const d=draft;if(!d.pw){toast('パスコードを入れてください');return;}roPass(d.pw);d.needPass=false;const f=d.files;d.files=null;d.pw='';roImages(f);};
